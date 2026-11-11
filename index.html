@@ -371,6 +371,39 @@
     .game-panel::before { margin: -11px -11px 11px; }
   }
 
+
+  /* ===== 나만의 다마고치 캐릭터 ===== */
+  .pet-panel { margin:16px 0; padding:14px; border:3px solid #17241f; background:#e8ece4; box-shadow:4px 4px 0 rgba(23,36,31,.24); }
+  .pet-head { display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; padding-bottom:9px; border-bottom:2px dashed #87968a; }
+  .pet-head h2 { margin:0; font-size:1.12rem; }
+  .pet-level { padding:4px 8px; background:#174b39; color:#fff8df; font-weight:900; }
+  .pet-main { display:grid; grid-template-columns:minmax(130px, .8fr) minmax(0,1.2fr); gap:14px; align-items:center; margin-top:12px; }
+  .pet-stage { min-height:190px; display:grid; place-items:center; align-content:center; gap:7px; border:2px solid #27372f; background:var(--pet-bg,#d4ded3); box-shadow:inset 0 0 0 4px rgba(255,255,255,.25); text-align:center; }
+  .pet-avatar { font-family:system-ui,sans-serif; font-size:5.3rem; line-height:1.2; filter:drop-shadow(3px 4px 0 rgba(23,36,31,.18)); animation:pet-bob 2s ease-in-out infinite; }
+  .pet-avatar.is-happy { animation:pet-hop .45s ease-in-out 2; }
+  @keyframes pet-bob { 50% { transform:translateY(-5px); } }
+  @keyframes pet-hop { 50% { transform:translateY(-13px) rotate(-7deg) scale(1.06); } }
+  .pet-message { margin:0; padding:8px; border:1px dashed #52635a; background:#f4f5ed; font-size:.82rem; }
+  .pet-stats { display:grid; gap:9px; }
+  .pet-stat-head { display:flex; justify-content:space-between; gap:8px; font-size:.8rem; font-weight:800; }
+  .pet-stat-track { height:10px; border:1px solid #27372f; background:#c4d0c5; }
+  .pet-stat-fill { height:100%; background:#4d9a70; transition:width .25s; }
+  .pet-actions { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:7px; margin-top:12px; }
+  .pet-action { min-height:42px; padding:6px 3px; border:2px solid #17241f; background:#f4f5ed; color:#17241f; font:inherit; font-size:.78rem; font-weight:900; cursor:pointer; box-shadow:2px 2px 0 #87958a; }
+  .pet-action:disabled { opacity:.45; cursor:not-allowed; }
+  .pet-tools { display:flex; flex-wrap:wrap; gap:7px; margin-top:12px; }
+  .pet-tools button { padding:6px 9px; border:1px solid #52635a; background:#d4ded3; color:#17241f; font:inherit; font-size:.78rem; cursor:pointer; }
+  .pet-tools button[aria-pressed="true"] { background:#174b39; color:#fff8df; }
+  .pet-create { display:grid; gap:10px; margin-top:12px; padding:12px; border:2px dashed #52635a; background:#e9eee6; }
+  .pet-create-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:9px; }
+  .pet-create button { min-height:40px; }
+  .pet-note { margin:8px 0 0; color:#52635a; font-size:.76rem; }
+  .pet-inventory { margin-top:10px; padding:10px; border:1px dashed #87968a; background:#e9eee6; }
+  .pet-inventory h3 { margin:0 0 7px; font-size:.9rem; }
+  .pet-item { display:inline-flex; gap:4px; align-items:center; margin:3px; padding:5px 8px; border:1px solid #87968a; background:#f4f5ed; font:inherit; font-size:.76rem; cursor:pointer; }
+  .pet-item[aria-pressed="true"] { border:2px solid #174b39; background:#d4ded3; font-weight:900; }
+  @media(max-width:520px) { .pet-main { grid-template-columns:1fr; } .pet-stage { min-height:155px; } .pet-avatar { font-size:4.5rem; } .pet-actions { grid-template-columns:repeat(2,minmax(0,1fr)); } .pet-create-grid { grid-template-columns:1fr; } }
+
 </style>
 </head>
 <body>
@@ -428,6 +461,12 @@
 
   <!-- 결과가 들어가는 곳 -->
   <div id="status" aria-live="polite"></div>
+
+  <section id="petPanel" class="pet-panel" aria-live="polite">
+    <div class="pet-head"><h2>🥚 나만의 DAMEAL 펫</h2><span class="pet-level">캐릭터를 준비하는 중...</span></div>
+    <p class="pet-note">나만의 캐릭터를 만들고 오늘의 활동으로 함께 성장해 보세요.</p>
+  </section>
+
   <section id="gamePanel" class="game-panel" aria-live="polite"></section>
   <div id="result"></div>
 
@@ -834,7 +873,7 @@ function awardXP(action, amount, day, category) {
     amount = gain;
   }
   GAME.actions.push(action); GAME.xp += amount; addActiveDay(day);
-  updateBadges(); saveGame(); renderGamePanel();
+  updateBadges(); saveGame(); renderGamePanel(); if (typeof renderPet === 'function') renderPet();
   return true;
 }
 function todayExerciseKinds(day) {
@@ -845,6 +884,189 @@ function todayExerciseKinds(day) {
 function maybeExerciseBonus(day) {
   const kinds = todayExerciseKinds(day);
   if (['cardio','strength','flex'].every(k => kinds.has(k))) awardXP(day + '|exercise-balance-bonus', 20, day);
+}
+
+
+/* ===================== 나만의 다마고치 캐릭터 ===================== */
+const PET_KEY = 'dameal-virtual-pet-v1';
+const PET_TYPES = [
+  { id:'cat', name:'고양이', egg:'🥚', emoji:'🐱' },
+  { id:'rabbit', name:'토끼', egg:'🥚', emoji:'🐰' },
+  { id:'bear', name:'곰', egg:'🥚', emoji:'🐻' },
+  { id:'frog', name:'개구리', egg:'🥚', emoji:'🐸' },
+  { id:'chick', name:'병아리', egg:'🥚', emoji:'🐥' }
+];
+const PET_COLORS = [
+  { id:'mint', name:'민트', value:'#c9e5d2' },
+  { id:'pink', name:'분홍', value:'#f3d3dc' },
+  { id:'yellow', name:'노랑', value:'#f4e6ae' },
+  { id:'blue', name:'하늘', value:'#cfe3f2' },
+  { id:'lavender', name:'라벤더', value:'#ded7f1' }
+];
+const PET_ITEMS = [
+  { id:'hat', name:'모자', icon:'🧢', level:2 },
+  { id:'glasses', name:'안경', icon:'🤓', level:4 },
+  { id:'ribbon', name:'리본', icon:'🎀', level:6 },
+  { id:'outfit', name:'의상', icon:'👕', level:8 },
+  { id:'room', name:'별빛 배경', icon:'🌟', level:10 }
+];
+let PET = null;
+function newPet(name, type, color) {
+  return { name, type, color, happiness:70, energy:70, bond:0, createdAt:Date.now(),
+    lastVisit:new Date().toISOString().slice(0,10), dailyActions:[], unlocked:[], equipped:[],
+    message:'안녕! 우리 함께 즐거운 하루를 보내자!' };
+}
+function loadPet() {
+  try {
+    const x = JSON.parse(localStorage.getItem(PET_KEY) || 'null');
+    if (x && typeof x === 'object' && typeof x.name === 'string' &&
+        PET_TYPES.some(t => t.id === x.type) && PET_COLORS.some(c => c.id === x.color)) {
+      PET = Object.assign(newPet(x.name.slice(0,12), x.type, x.color), x);
+      PET.happiness = Math.max(0,Math.min(100,Number(PET.happiness)||0));
+      PET.energy = Math.max(0,Math.min(100,Number(PET.energy)||0));
+      PET.bond = Math.max(0,Math.min(100,Number(PET.bond)||0));
+      PET.dailyActions = Array.isArray(PET.dailyActions) ? PET.dailyActions : [];
+      PET.unlocked = Array.isArray(PET.unlocked) ? PET.unlocked : [];
+      PET.equipped = Array.isArray(PET.equipped) ? PET.equipped : [];
+      const today = toIso(new Date());
+      if (PET.lastVisit !== today) {
+        PET.lastVisit = today;
+        PET.dailyActions = [];
+        PET.energy = Math.min(100, PET.energy + 8);
+        PET.message = '오늘도 만나서 반가워! 천천히 같이 놀자.';
+        savePet();
+      }
+    }
+  } catch (e) { PET = null; }
+}
+function savePet() {
+  try { if (PET) localStorage.setItem(PET_KEY, JSON.stringify(PET)); } catch (e) {}
+}
+function petLevel() { return Math.floor(GAME.xp / 100) + 1; }
+function petStage() {
+  const lv = petLevel();
+  return lv >= 10 ? '성숙한 친구' : lv >= 5 ? '어린이' : lv >= 2 ? '아기' : '알';
+}
+function petVisual() {
+  const type = PET_TYPES.find(t => t.id === PET.type) || PET_TYPES[0];
+  if (petLevel() < 2) return '🥚';
+  return type.emoji;
+}
+function petItemLabel(item) {
+  const def = PET_ITEMS.find(x => x.id === item);
+  return def ? def.icon + ' ' + def.name : '';
+}
+function renderPet() {
+  const panel = $('petPanel');
+  if (!panel) return;
+  if (!PET) {
+    const name = el('input',{id:'petName',type:'text',maxlength:'12',placeholder:'캐릭터 이름 (최대 12자)', 'aria-label':'캐릭터 이름'});
+    const type = el('select',{id:'petType','aria-label':'캐릭터 종류'});
+    PET_TYPES.forEach(t => type.append(el('option',{value:t.id},t.emoji + ' ' + t.name)));
+    const color = el('select',{id:'petColor','aria-label':'캐릭터 색상'});
+    PET_COLORS.forEach(c => color.append(el('option',{value:c.id},c.name)));
+    const create = el('button',{type:'button',class:'game-action'},'캐릭터 만들기');
+    create.addEventListener('click', () => {
+      const n = name.value.trim().replace(/[<>]/g,'').slice(0,12);
+      if (!n) { name.focus(); name.setCustomValidity('캐릭터 이름을 입력해 주세요.'); name.reportValidity(); return; }
+      name.setCustomValidity('');
+      PET = newPet(n,type.value,color.value);
+      savePet(); renderPet();
+    });
+    const form = el('div',{class:'pet-create'},
+      el('strong',null,'나만의 캐릭터를 만들어 보세요!'),
+      el('div',{class:'pet-create-grid'},
+        el('label',null,'이름',name),
+        el('label',null,'캐릭터 종류',type),
+        el('label',null,'캐릭터 색상',color)
+      ), create,
+      el('p',{class:'pet-note'},'캐릭터와 활동 기록은 현재 브라우저에만 저장돼요.')
+    );
+    panel.replaceChildren(el('div',{class:'pet-head'},el('h2',null,'🥚 나만의 DAMEAL 펫'),el('span',{class:'pet-level'},'첫 만남')),
+      el('p',{class:'pet-note'},'이름과 모습, 색상을 골라 나만의 친구를 만들어 주세요.'),form);
+    return;
+  }
+  const level = petLevel(), within = GAME.xp % 100;
+  const type = PET_TYPES.find(t => t.id === PET.type) || PET_TYPES[0];
+  const color = PET_COLORS.find(c => c.id === PET.color) || PET_COLORS[0];
+  const avatar = el('div',{class:'pet-avatar','aria-label':type.name+' 캐릭터'},petVisual());
+  const wornIcons = PET.equipped.map(id => PET_ITEMS.find(item => item.id === id)).filter(Boolean).map(item => item.icon).join('');
+  if (wornIcons) avatar.append(el('span',{style:'display:block;font-size:1.5rem;line-height:1'},wornIcons));
+  if (PET.message && /기뻐|신나|고마워|반가워|최고/.test(PET.message)) avatar.classList.add('is-happy');
+  const stage = el('div',{class:'pet-stage',style:'--pet-bg:'+color.value},
+    avatar,
+    el('strong',null,PET.name),
+    el('span',{class:'fine'},petStage()+' · '+type.name),
+    el('p',{class:'pet-message'},PET.message || '오늘도 함께 놀자!')
+  );
+  const stat = (label,value,fill) => el('div',null,
+    el('div',{class:'pet-stat-head'},el('span',null,label),el('span',null,value+'/100')),
+    el('div',{class:'pet-stat-track'},el('div',{class:'pet-stat-fill',style:'width:'+value+'%;background:'+fill}))
+  );
+  const stats = el('div',{class:'pet-stats'},
+    stat('💖 행복도',PET.happiness,'#df8aa4'),
+    stat('⚡ 활력',PET.energy,'#d5a43c'),
+    stat('🤝 친밀도',PET.bond,'#6b9bc9'),
+    el('div',null,el('div',{class:'pet-stat-head'},el('span',null,'🌱 성장 경험치'),el('span',null,GAME.xp+' XP')),
+      el('div',{class:'xp-track'},el('div',{class:'xp-fill',style:'width:'+within+'%'})),
+      el('p',{class:'pet-note'},'레벨 '+level+' · 다음 성장까지 '+(100-within)+' XP'))
+  );
+  const actions = [
+    ['pet','🖐️ 쓰다듬기','쓰다듬어 줘서 고마워!'],
+    ['talk','💬 말 걸기','네 이야기를 들으니 기분이 좋아!'],
+    ['snack','🍪 간식 주기','맛있는 가상 간식 고마워!'],
+    ['play','🎮 놀아주기','같이 노니까 정말 신나!']
+  ];
+  const actionBox = el('div',{class:'pet-actions'});
+  actions.forEach(([id,label,msg]) => {
+    const used = PET.dailyActions.includes(id);
+    const b = el('button',{type:'button',class:'pet-action',disabled:used,'aria-label':label},used ? label+' ✓' : label);
+    b.addEventListener('click',() => {
+      if (PET.dailyActions.includes(id)) return;
+      PET.dailyActions.push(id);
+      PET.message = msg;
+      if (id==='pet') { PET.happiness=Math.min(100,PET.happiness+8); PET.bond=Math.min(100,PET.bond+5); }
+      if (id==='talk') { PET.happiness=Math.min(100,PET.happiness+5); PET.bond=Math.min(100,PET.bond+8); }
+      if (id==='snack') { PET.happiness=Math.min(100,PET.happiness+10); PET.energy=Math.min(100,PET.energy+5); PET.bond=Math.min(100,PET.bond+3); }
+      if (id==='play') { PET.happiness=Math.min(100,PET.happiness+8); PET.energy=Math.max(0,PET.energy-5); PET.bond=Math.min(100,PET.bond+6); }
+      awardXP('pet|'+toIso(new Date())+'|'+id,2,toIso(new Date()),'participation');
+      savePet(); renderPet();
+    });
+    actionBox.append(b);
+  });
+  const tools = el('div',{class:'pet-tools'});
+  const reset = el('button',{type:'button'},'이름·캐릭터 변경');
+  reset.addEventListener('click',() => {
+    if (!confirm('캐릭터를 새로 만들까요? 기존 캐릭터의 꾸미기와 상태가 초기화됩니다.')) return;
+    try { localStorage.removeItem(PET_KEY); } catch (e) {}
+    PET = null; renderPet();
+  });
+  tools.append(reset,el('span',{class:'pet-note'},'각 상호작용은 하루 한 번 · 활동 XP는 하루 최대 10 XP'));
+  const inventory = el('div',{class:'pet-inventory'},el('h3',null,'🎒 꾸미기 아이템'));
+  PET_ITEMS.forEach(item => {
+    const unlocked = level >= item.level;
+    if (unlocked && !PET.unlocked.includes(item.id)) PET.unlocked.push(item.id);
+    const equipped = PET.equipped.includes(item.id);
+    const b = el('button',{type:'button',class:'pet-item','aria-pressed':String(equipped),disabled:!unlocked},
+      (unlocked ? item.icon : '🔒')+' '+item.name+(unlocked?'':' · Lv.'+item.level));
+    b.addEventListener('click',() => {
+      if (!unlocked) return;
+      if (PET.equipped.includes(item.id)) PET.equipped = PET.equipped.filter(x=>x!==item.id);
+      else PET.equipped.push(item.id);
+      PET.message = equipped ? '꾸미기를 바꿨어. 이것도 잘 어울리지?' : item.name+' 장착 완료! 멋지다!';
+      savePet(); renderPet();
+    });
+    inventory.append(b);
+  });
+  const worn = PET.equipped.map(petItemLabel).filter(Boolean);
+  const outfit = el('p',{class:'pet-note'},worn.length?'착용 중: '+worn.join(' · '):'레벨을 올려 새로운 꾸미기를 해금해 보세요.');
+  inventory.append(outfit);
+  panel.replaceChildren(
+    el('div',{class:'pet-head'},el('h2',null,'🐾 '+PET.name+'의 공간'),el('span',{class:'pet-level'},'Lv.'+level+' · '+petStage())),
+    el('div',{class:'pet-main'},stage,stats),
+    actionBox,tools,inventory
+  );
+  savePet();
 }
 
 /* ===================== 학교 운동 추천 ===================== */
@@ -1593,7 +1815,9 @@ function loadProfile() {
   loadProfile();
   loadStore();
   loadGame();
+  loadPet();
   loadMealLog();
+  renderPet();
   renderGamePanel();
   initShare();
   $('meBox').addEventListener('input', onProfileInput);
