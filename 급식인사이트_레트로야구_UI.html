@@ -1,0 +1,1605 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>급식인사이트</title>
+<style>
+  /* ===== 색상·글꼴 (여기만 고치면 전체 분위기가 바뀝니다) ===== */
+  :root {
+    color-scheme: light;
+    --bg: #f6f7f4;
+    --card: #ffffff;
+    --ink: #1c1f1a;
+    --ink-2: #555b52;
+    --line: #dfe2da;
+    --accent: #1f6f4a;       /* 버튼·강조 */
+    --accent-ink: #ffffff;
+    --carb: #2a78d6;         /* 탄수화물 */
+    --prot: #eb6834;         /* 단백질 */
+    --fat: #1baf7a;          /* 지방 */
+    --ok: #1f6f4a;
+    --warn: #a8530f;
+    --low: #1c5cab;
+    --star: #b7791f;
+    --err: #b3261e;
+    --err-bg: #fdecea;
+    --info-bg: #eef3ee;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #141713;
+      --card: #1d211c;
+      --ink: #eef0ea;
+      --ink-2: #b4baad;
+      --line: #343a31;
+      --accent: #5cc08d;
+      --accent-ink: #0f1a13;
+      --carb: #3987e5;
+      --prot: #d95926;
+      --fat: #199e70;
+      --ok: #5cc08d;
+      --warn: #e6a15f;
+      --low: #7fb2f0;
+      --star: #e0b04a;
+      --err: #f2b8b5;
+      --err-bg: #3a1f1d;
+      --info-bg: #222821;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "Pretendard", "Apple SD Gothic Neo", "Malgun Gothic", "Noto Sans KR", system-ui, sans-serif;
+    line-height: 1.55;
+  }
+  .wrap { max-width: 720px; margin: 0 auto; padding: 20px 16px 40px; }
+  h1 { font-size: 1.5rem; margin: 0; letter-spacing: -0.02em; }
+  .school { color: var(--ink-2); margin: 2px 0 16px; }
+
+  /* ===== 조회 폼 ===== */
+  form.search {
+    background: var(--card);
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 14px;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+    gap: 12px;
+    align-items: end;
+  }
+  label { display: grid; gap: 4px; font-size: 0.85rem; color: var(--ink-2); min-width: 0; }
+  input, select, button { font: inherit; }
+  input, select {
+    width: 100%;
+    min-width: 0;
+    padding: 9px 10px;
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    background: var(--bg);
+    color: var(--ink);
+  }
+  button.go {
+    padding: 10px 14px;
+    border: 0;
+    border-radius: 8px;
+    background: var(--accent);
+    color: var(--accent-ink);
+    font-weight: 700;
+    cursor: pointer;
+  }
+  button.go:disabled { opacity: 0.55; cursor: progress; }
+  :focus-visible { outline: 3px solid var(--carb); outline-offset: 2px; }
+
+  /* ===== 안내 상자 ===== */
+  .notice { margin: 14px 0 0; padding: 12px 14px; border-radius: 8px; background: var(--info-bg); font-size: 0.92rem; }
+  .notice.error { background: var(--err-bg); color: var(--err); }
+  .notice strong { display: block; margin-bottom: 2px; }
+  .count { margin: 14px 0 0; font-size: 0.9rem; color: var(--ink-2); }
+
+  /* ===== 날짜 카드 ===== */
+  .day { margin-top: 16px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; overflow: hidden; }
+  .day > h2 { margin: 0; padding: 12px 14px; font-size: 1.05rem; border-bottom: 1px solid var(--line); }
+  .meal { padding: 14px; min-width: 0; }
+  .meal + .meal { border-top: 1px dashed var(--line); }
+  .meal-head { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: baseline; justify-content: space-between; }
+  .meal-name { font-weight: 700; }
+  .kcal { font-variant-numeric: tabular-nums; color: var(--ink-2); }
+  .kcal b { color: var(--ink); font-size: 1.15rem; }
+  ul.menu { list-style: none; margin: 10px 0 0; padding: 0; }
+  ul.menu li { padding: 5px 0; border-bottom: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; }
+  ul.menu li:last-child { border-bottom: 0; }
+  .tag { font-size: 0.72rem; padding: 1px 6px; border-radius: 99px; border: 1px solid var(--line); color: var(--ink-2); white-space: nowrap; }
+  .allergy-sum { margin: 10px 0 0; font-size: 0.85rem; color: var(--ink-2); }
+
+  /* ===== 탄단지 막대 ===== */
+  .nutri { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--line); }
+  .nutri h3 { margin: 0 0 8px; font-size: 0.95rem; }
+  .grams { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 0.9rem; font-variant-numeric: tabular-nums; }
+  .dot { width: 10px; height: 10px; border-radius: 2px; display: inline-block; flex: none; }
+  .st-ok { color: var(--ok); font-weight: 600; }
+  .st-low, .st-high { color: var(--ink-2); font-weight: 600; }
+  .fine { margin: 8px 0 0; font-size: 0.78rem; color: var(--ink-2); }
+  details { margin-top: 10px; font-size: 0.88rem; }
+  summary { cursor: pointer; color: var(--ink-2); }
+  details dl { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; margin: 8px 0 0; font-variant-numeric: tabular-nums; }
+  details dt { color: var(--ink-2); }
+  details dd { margin: 0; text-align: right; }
+  details p { margin: 8px 0 0; overflow-wrap: anywhere; }
+
+  /* ===== 내 한 끼 목표 ===== */
+  details.me { margin-top: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 0 14px; font-size: 0.95rem; }
+  details.me > summary { padding: 12px 0; font-weight: 700; color: var(--ink); }
+  .me-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; padding-bottom: 12px; }
+  #meOut { padding-bottom: 14px; }
+  #meOut p { margin: 0 0 6px; }
+  #meOut .big { font-variant-numeric: tabular-nums; }
+  #meOut .big b { font-size: 1.05rem; }
+
+  /* ===== 영양 비교 카드 ===== */
+  .cmp-head { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: center; justify-content: space-between; }
+  .cmp-head h3 { margin: 0; font-size: 1rem; }
+  .chip { font-size: 0.78rem; font-weight: 600; padding: 3px 10px; border-radius: 99px; background: var(--info-bg); color: var(--ink-2); }
+  .cmp-sum { margin: 10px 0 12px; padding: 10px 12px; border-radius: 8px; background: var(--info-bg); font-size: 0.92rem; font-weight: 600; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+  .tile { display: grid; gap: 4px; min-width: 0; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
+  .tile-name { display: flex; align-items: center; gap: 6px; font-size: 0.82rem; color: var(--ink-2); }
+  .tile-val { font-size: 0.85rem; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  .tile-val b { font-size: 1.5rem; letter-spacing: -0.02em; color: var(--ink); }
+  .tile-goal { font-size: 0.8rem; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+  /* 목표 대비 막대: 검은 선 = 내 목표, 연한 띠 = 비슷한 범위 */
+  .gauge { position: relative; height: 10px; margin: 4px 0; border-radius: 99px; background: var(--line); overflow: hidden; }
+  .gauge .band { position: absolute; top: 0; bottom: 0; background: var(--ink); opacity: 0.22; }
+  .gauge .fill { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 99px; }
+  .gauge .tick { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: var(--ink); }
+  .pill { justify-self: start; font-size: 0.8rem; font-weight: 700; padding: 2px 9px; border-radius: 99px; border: 1px solid currentColor; font-variant-numeric: tabular-nums; }
+  .pill.same { color: var(--ok); }
+  .pill.more { color: var(--ink-2); }
+  .pill.less { color: var(--ink-2); }
+
+  /* ===== 학교 운동 추천 ===== */
+  .exercise { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--line); }
+  .ex-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
+  .ex { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: center; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
+  .ex-name { font-weight: 700; min-width: 0; }
+  .ex-meta { grid-column: 1; display: flex; flex-wrap: wrap; gap: 4px 8px; align-items: center; font-size: 0.8rem; color: var(--ink-2); }
+  .ex-dose { grid-column: 2; grid-row: 1 / span 2; text-align: right; font-weight: 700; color: var(--accent); font-variant-numeric: tabular-nums; max-width: 11rem; }
+  @media (max-width: 460px) {
+    .ex { grid-template-columns: 1fr; }
+    .ex-dose { grid-column: 1; grid-row: auto; text-align: left; max-width: none; }
+  }
+  .why { margin: 12px 0 0; padding-left: 1.1rem; font-size: 0.86rem; color: var(--ink-2); display: grid; gap: 4px; }
+
+  /* ===== 맞춤 가이드 ===== */
+  .guide { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--line); }
+  .tip-list { list-style: none; margin: 10px 0 0; padding: 0; display: grid; gap: 8px; }
+  .tip { display: grid; grid-template-columns: auto 1fr; gap: 4px 10px; align-items: start; font-size: 0.9rem; }
+  .tip .tag { margin-top: 2px; max-width: 9rem; overflow: hidden; text-overflow: ellipsis; }
+
+  /* ===== 평점·후기 ===== */
+  .review { margin-top: 16px; padding-top: 14px; border-top: 1px dashed var(--line); }
+  .stars { display: flex; gap: 2px; margin: 6px 0 8px; }
+  .star { font-size: 1.7rem; line-height: 1; padding: 2px 5px; border: 0; background: none; color: var(--ink-2); cursor: pointer; }
+  .star.on { color: var(--star); }
+  .review input[type="text"] { margin-top: 2px; }
+  .friend-line { margin: 8px 0 0; font-size: 0.86rem; color: var(--ink-2); }
+  .vote { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-left: auto; align-items: center; }
+  .vbtn { font-size: 0.75rem; padding: 2px 9px; border-radius: 99px; border: 1px solid var(--line); background: none; color: var(--ink-2); cursor: pointer; }
+  .vbtn[aria-pressed="true"].up { border-color: var(--ok); color: var(--ok); font-weight: 700; }
+  .vbtn[aria-pressed="true"].down { border-color: var(--warn); color: var(--warn); font-weight: 700; }
+  .vote-fr { flex-basis: 100%; font-size: 0.74rem; color: var(--ink-2); text-align: right; }
+
+  /* ===== 공유 상자 ===== */
+  details.share { margin-top: 16px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; padding: 0 14px; font-size: 0.92rem; }
+  details.share > summary { padding: 12px 0; font-weight: 700; color: var(--ink); }
+  .share-body { display: grid; gap: 16px; padding-bottom: 14px; }
+  .share-body h3 { margin: 0 0 6px; font-size: 0.95rem; }
+  .share-body .fine { margin: 4px 0 0; }
+  textarea { width: 100%; min-height: 5rem; padding: 8px 10px; font: inherit; font-size: 0.8rem; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); resize: vertical; }
+  .row { display: flex; flex-wrap: wrap; gap: 8px; align-items: end; }
+  .row label { flex: 1 1 10rem; }
+  button.sub { padding: 9px 14px; border: 1px solid var(--accent); border-radius: 8px; background: none; color: var(--accent); font-weight: 700; cursor: pointer; }
+  button.small { padding: 3px 10px; font-size: 0.78rem; border: 1px solid var(--line); border-radius: 99px; background: none; color: var(--ink-2); cursor: pointer; }
+  .friend { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 6px; }
+  .rank { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 14px; }
+  .rank h4 { margin: 0 0 4px; font-size: 0.85rem; color: var(--ink-2); }
+  .rank ol { margin: 0; padding-left: 1.2rem; display: grid; gap: 3px; }
+
+  /* ===== 오늘의 게임 ===== */
+  .game-panel { margin: 14px 0; padding: 14px; background: var(--card); border: 1px solid var(--line); border-radius: 10px; }
+  .game-top { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px; }
+  .game-level { font-weight:800; font-size:1.05rem; }
+  .xp-track { height:9px; border-radius:99px; background:var(--line); overflow:hidden; margin:8px 0; }
+  .xp-fill { height:100%; background:var(--accent); border-radius:99px; }
+  .badge-list { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+  .badge-item { border:1px solid var(--line); border-radius:99px; padding:3px 9px; font-size:.76rem; }
+  .quest-list { list-style:none; margin:8px 0 0; padding:0; display:grid; gap:7px; }
+  .quest-list label { display:flex; grid-template-columns:none; align-items:flex-start; gap:8px; color:var(--ink); font-size:.88rem; }
+  .quest-list input { width:auto; margin-top:4px; }
+  .portion-row { display:flex; flex-wrap:wrap; gap:8px; align-items:center; width:100%; margin:3px 0 2px 0; }
+  .portion-row label { display:flex; align-items:center; gap:5px; font-size:.76rem; color:var(--ink-2); }
+  .portion-row select { width:auto; padding:4px 7px; font-size:.78rem; }
+  .game-action { padding:5px 10px; border:1px solid var(--accent); border-radius:99px; background:none; color:var(--accent); font-size:.78rem; font-weight:700; cursor:pointer; }
+  .game-action:disabled { opacity:.6; cursor:default; }
+  .estimate { margin-top:10px; padding:10px; background:var(--info-bg); border-radius:8px; font-size:.83rem; }
+  .estimate strong { display:block; margin-bottom:4px; }
+
+  /* ===== 아래쪽 출처 ===== */
+  footer { margin-top: 28px; padding-top: 14px; border-top: 1px solid var(--line); font-size: 0.82rem; color: var(--ink-2); }
+  footer p { margin: 0 0 6px; }
+
+  /* ===== RETRO BASEBALL / PIXEL UI THEME ===== */
+  :root {
+    color-scheme: light;
+    --bg: #d2dbd0;
+    --card: #e8ece4;
+    --ink: #17241f;
+    --ink-2: #52635a;
+    --line: #27372f;
+    --accent: #174b39;
+    --accent-ink: #fff8df;
+    --carb: #376ec7;
+    --prot: #d54a3e;
+    --fat: #318a58;
+    --ok: #286b46;
+    --warn: #9a6b16;
+    --low: #376ec7;
+    --star: #bd8a24;
+    --err: #b83c32;
+    --err-bg: #f2d8d1;
+    --info-bg: #c4d0c5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: light;
+      --bg: #d2dbd0; --card: #e8ece4; --ink: #17241f; --ink-2: #52635a;
+      --line: #27372f; --accent: #174b39; --accent-ink: #fff8df;
+      --carb: #376ec7; --prot: #d54a3e; --fat: #318a58; --ok: #286b46;
+      --warn: #9a6b16; --low: #376ec7; --star: #bd8a24; --err: #b83c32;
+      --err-bg: #f2d8d1; --info-bg: #c4d0c5;
+    }
+  }
+  * { image-rendering: pixelated; }
+  body {
+    background:
+      linear-gradient(90deg, rgba(23,36,31,.035) 1px, transparent 1px),
+      linear-gradient(rgba(23,36,31,.035) 1px, transparent 1px),
+      var(--bg);
+    background-size: 8px 8px;
+    color: var(--ink);
+    font-family: "DungGeunMo", "둥근모꼴", "Courier New", "Malgun Gothic", monospace;
+    letter-spacing: -.035em;
+  }
+  .wrap { max-width: 760px; padding: 22px 16px 44px; }
+  h1 {
+    display: inline-block; margin: 0 0 4px; padding: 4px 9px;
+    background: #17241f; color: #fff5d6; border: 2px solid #17241f;
+    box-shadow: 4px 4px 0 #87958a; font-size: 1.65rem; letter-spacing: .02em;
+    text-shadow: 2px 2px 0 #7c8a7d;
+  }
+  .school { margin: 7px 0 18px; color: #52635a; font-size: .94rem; }
+  form.search, .day, details.me, details.share, .game-panel {
+    border: 2px solid #17241f; border-radius: 0; background: var(--card);
+    box-shadow: 4px 4px 0 rgba(23,36,31,.24);
+  }
+  form.search { padding: 12px; gap: 10px; }
+  label { color: var(--ink-2); font-weight: 700; }
+  input, select, textarea {
+    border: 2px solid #27372f; border-radius: 0; background: #f4f5ed;
+    color: #17241f; box-shadow: inset 2px 2px 0 rgba(23,36,31,.10);
+  }
+  input, select { padding: 9px 10px; }
+  button.go, .game-action, button.sub {
+    border: 2px solid #17241f; border-radius: 0; font-weight: 900;
+    box-shadow: 3px 3px 0 #87958a; transition: transform .08s, box-shadow .08s;
+  }
+  button.go {
+    padding: 11px 14px; background: #174b39; color: #fff8df;
+    text-shadow: 1px 1px #102c22;
+  }
+  button.go:active, .game-action:active, button.sub:active {
+    transform: translate(2px,2px); box-shadow: 1px 1px 0 #87958a;
+  }
+  :focus-visible { outline: 3px dashed #376ec7; outline-offset: 3px; }
+  .notice { border: 2px dashed #27372f; border-radius: 0; background: #c4d0c5; }
+  .notice.error { background: #f2d8d1; }
+  .day { margin-top: 18px; overflow: hidden; }
+  .day > h2 {
+    margin: 0; padding: 11px 13px; color: #fff8df; background: #174b39;
+    border-bottom: 3px solid #17241f; font-size: 1.12rem;
+    box-shadow: inset 0 -4px 0 rgba(0,0,0,.12);
+  }
+  .meal { padding: 14px; }
+  .meal + .meal { border-top: 2px dashed #738277; }
+  .meal-head { gap: 8px; }
+  .meal-name { font-size: 1.05rem; font-weight: 900; }
+  .kcal b { color: #17241f; }
+  ul.menu li { border-bottom: 1px dashed #aab6aa; padding: 7px 2px; }
+  .tag, .chip, .pill, .badge-item {
+    border-radius: 0; border: 1px solid #52635a; background: #d4ded3; color: #26372e;
+  }
+  .nutri, .exercise, .guide, .review { border-color: #87968a; }
+  .tile { border: 2px solid #87968a; border-radius: 0; background: #e2e8df; }
+  .gauge { border-radius: 0; background: #b9c5b9; }
+  .gauge .fill { border-radius: 0; }
+  .cmp-sum, .estimate { border: 1px dashed #52635a; border-radius: 0; background: #d4ded3; }
+  .ex { border: 2px solid #87968a; border-radius: 0; background: #e5eae2; }
+  .ex-dose { color: #174b39; }
+  .tip { padding: 8px; border: 1px dashed #87968a; background: #e4e9e1; }
+  .tip .tag { border-radius: 0; }
+  details.me, details.share { padding: 0 14px; }
+  details.me > summary, details.share > summary {
+    padding: 13px 0; color: #17241f; font-weight: 900;
+    border-bottom: 1px dashed #87968a;
+  }
+  .game-panel {
+    padding: 14px; background: #dce4d9; position: relative; overflow: hidden;
+  }
+  .game-panel::before {
+    content: "PLAY BALL  •  DAILY TRAINING";
+    display: block; margin: -14px -14px 13px; padding: 7px 12px;
+    color: #fff5d6; background: #174b39; border-bottom: 3px solid #17241f;
+    font-size: .78rem; font-weight: 900; letter-spacing: .09em;
+  }
+  .game-top { padding: 9px; border: 2px dashed #52635a; background: #e9eee6; }
+  .game-level { font-size: 1.15rem; font-weight: 900; }
+  .xp-track { height: 13px; border: 2px solid #17241f; border-radius: 0; background: #aab8aa; }
+  .xp-fill { border-radius: 0; background: repeating-linear-gradient(90deg,#e7b64b 0 8px,#d59a2c 8px 12px); }
+  .badge-list { gap: 7px; }
+  .badge-item { padding: 4px 8px; font-weight: 800; box-shadow: 2px 2px 0 #aab6aa; }
+  .quest-list { gap: 8px; }
+  .quest-list li { padding: 7px 8px; border: 1px dashed #87968a; background: #e9eee6; }
+  .quest-list label { color: #17241f; }
+  .quest-list input { accent-color: #174b39; }
+  .portion-row { padding-top: 6px; border-top: 1px dotted #aab6aa; }
+  .portion-row select { border-radius: 0; }
+  .game-action { padding: 6px 10px; background: #174b39; color: #fff8df; }
+  .star { color: #7a806f; }
+  .star.on { color: #bd8a24; }
+  .vbtn { border-radius: 0; border: 1px solid #52635a; background: #e8ece4; color: #26372e; }
+  button.small { border-radius: 0; border: 1px solid #52635a; background: #e8ece4; }
+  .rank h4 { color: #174b39; }
+  footer { border-top: 2px dashed #87968a; }
+  @media (max-width: 480px) {
+    .wrap { padding: 16px 10px 34px; }
+    h1 { font-size: 1.42rem; }
+    form.search { grid-template-columns: 1fr; }
+    .game-panel { padding: 11px; }
+    .game-panel::before { margin: -11px -11px 11px; }
+  }
+
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>급식인사이트</h1>
+  <p class="school" id="schoolName"></p>
+
+  <!-- 조회 조건 -->
+  <form class="search" id="searchForm">
+    <label>날짜
+      <input type="date" id="mealDate" required>
+    </label>
+    <button class="go" id="goBtn" type="submit">급식 조회</button>
+  </form>
+
+  <div id="keyWarn" class="notice error" hidden>
+    <strong>인증키가 아직 설정되지 않았습니다.</strong>
+    코드 위쪽 CONFIG의 API_KEY에 실습 때 안내받은 인증키를 넣어 주세요.
+  </div>
+
+  <!-- 내 한 끼 목표 (입력하면 급식과 나란히 비교) -->
+  <details class="me" id="meBox" open>
+    <summary>내 한 끼 목표·운동 추천 (선택)</summary>
+    <div class="me-grid">
+      <label>성별
+        <select id="meSex"><option value="m">남성</option><option value="f">여성</option></select>
+      </label>
+      <label>나이(만)
+        <input type="number" id="meAge" inputmode="numeric" min="7" max="99" placeholder="예: 17">
+      </label>
+      <label>키(cm)
+        <input type="number" id="meHeight" inputmode="decimal" min="100" max="230" placeholder="예: 170">
+      </label>
+      <label>체중(kg)
+        <input type="number" id="meWeight" inputmode="decimal" min="15" max="250" placeholder="예: 60">
+      </label>
+      <label>활동량
+        <select id="meAct">
+          <option value="sed">거의 안 움직임</option>
+          <option value="light">가벼운 활동</option>
+          <option value="mid" selected>보통</option>
+          <option value="high">활발</option>
+        </select>
+      </label>
+      <label>목표
+        <select id="meGoal">
+          <option value="keep">체중 유지</option>
+          <option value="lose">체중 감량</option>
+          <option value="gain">근육 증가</option>
+        </select>
+      </label>
+    </div>
+    <div id="meOut" aria-live="polite"></div>
+  </details>
+
+  <!-- 결과가 들어가는 곳 -->
+  <div id="status" aria-live="polite"></div>
+  <section id="gamePanel" class="game-panel" aria-live="polite"></section>
+  <div id="result"></div>
+
+  <!-- 평점 공유 · 메뉴 호불호 -->
+  <details class="share" id="shareBox">
+    <summary>평점 공유·메뉴 호불호</summary>
+    <div class="share-body">
+      <p class="fine">평점·후기는 이 기기(브라우저)에만 저장됩니다. 친구와는 아래 글을 복사해서 메신저로 주고받으며 공유합니다. 이름·학번·연락처 같은 개인정보는 쓰지 마세요.</p>
+
+      <div>
+        <h3>내 평점 보내기</h3>
+        <div class="row">
+          <label>닉네임 (실명 말고 별명)
+            <input type="text" id="nick" maxlength="12" placeholder="예: 급식러버">
+          </label>
+          <button class="sub" id="copyBtn" type="button">내 평점 복사</button>
+        </div>
+        <textarea id="exportBox" readonly hidden aria-label="친구에게 보낼 내 평점 글"></textarea>
+        <p class="fine" id="exportMsg" aria-live="polite"></p>
+      </div>
+
+      <div>
+        <h3>친구 평점 가져오기</h3>
+        <textarea id="importBox" placeholder="친구가 보낸 글을 여기에 붙여 넣으세요" aria-label="친구가 보낸 평점 글"></textarea>
+        <div class="row" style="margin-top:8px"><button class="sub" id="importBtn" type="button">가져오기</button></div>
+        <p class="fine" id="importMsg" aria-live="polite"></p>
+        <div id="friendList"></div>
+      </div>
+
+      <div>
+        <h3>메뉴 호불호</h3>
+        <div id="rank" class="rank"></div>
+      </div>
+    </div>
+  </details>
+
+  <footer>
+    <p><b>출처</b> 교육부·한국교육학술정보원(KERIS) 나이스 교육정보 개방 포털, 학교급식 식단정보</p>
+    <p><b>조회 기준</b> <span id="criteria">아직 조회하지 않았습니다.</span></p>
+    <p>인증키가 들어 있는 파일은 다른 사람에게 보내거나 공개 저장소에 올리지 마세요.</p>
+  </footer>
+</div>
+
+<script>
+/* =====================================================
+   설정 (초보자는 이 부분만 고치면 됩니다)
+   ===================================================== */
+const CONFIG = {
+  // 인증키: 실습 때 교사의 안내에 따라 'YOUR_API_KEY' 자리에 직접 넣으세요.
+  API_KEY: '95337edfb2b2456e9866ae124aeafe23',
+  BASE_URL: 'https://open.neis.go.kr/hub/mealServiceDietInfo',
+  ATPT_OFCDC_SC_CODE: 'B10',        // 시도교육청 코드 (B10 = 서울특별시교육청)
+  SD_SCHUL_CODE: '7010259',         // 표준 학교코드
+  SCHOOL_NAME: '한영외국어고등학교', // 화면 제목에 보이는 학교 이름
+  PAGE_SIZE: 100,                   // 한 번에 받을 건수 (pSize)
+  MAX_PAGES: 5,                     // 이어 받을 최대 쪽수
+  SHOW_MEALS: ['2', '3']            // 보여 줄 식사구분 코드 (2=중식, 3=석식, 1=조식)
+};
+
+// 알레르기 번호표
+const ALLERGY = {
+  1: '난류', 2: '우유', 3: '메밀', 4: '땅콩', 5: '대두', 6: '밀', 7: '고등어',
+  8: '게', 9: '새우', 10: '돼지고기', 11: '복숭아', 12: '토마토', 13: '아황산류',
+  14: '호두', 15: '닭고기', 16: '쇠고기', 17: '오징어', 18: '조개류', 19: '잣'
+};
+
+// 영양소 이름과 막대 색
+const RANGE = {
+  carb: { name: '탄수화물', color: 'var(--carb)' },
+  prot: { name: '단백질',   color: 'var(--prot)' },
+  fat:  { name: '지방',     color: 'var(--fat)' }
+};
+
+/* ===================== 내 한 끼 목표 ===================== */
+// 목표별 탄·단·지 비율(%): 한 끼 목표량을 계산하는 기준값(합계 100)
+const GOALS = {
+  keep: { name: '체중 유지', ratio: { carb: 55, prot: 20, fat: 25 } },
+  lose: { name: '체중 감량', ratio: { carb: 45, prot: 27, fat: 28 } },
+  gain: { name: '근육 증가', ratio: { carb: 52, prot: 23, fat: 25 } }
+};
+// 활동량 계수
+const ACTIVITY = { sed: 1.2, light: 1.375, mid: 1.55, high: 1.725 };
+const MEALS_PER_DAY = 3;      // 하루 3끼로 똑같이 나눔
+const SIMILAR_PCT = 10;       // 목표와 ±10% 이내면 '비슷함'
+const PROFILE_KEY = 'gsik-profile'; // 브라우저에 저장하는 이름
+
+let TARGET = null;   // 계산된 한 끼 목표 (없으면 null)
+let lastRows = null; // 마지막으로 받은 급식 (목표를 바꾸면 다시 그리기 위해)
+
+// 입력 칸 읽기 → { profile } 또는 { error } 또는 { empty:true }
+function readProfile() {
+  const p = {
+    sex: $('meSex').value,
+    age: parseFloat($('meAge').value),
+    height: parseFloat($('meHeight').value),
+    weight: parseFloat($('meWeight').value),
+    activity: $('meAct').value,
+    goal: $('meGoal').value
+  };
+  if (![p.age, p.height, p.weight].every(Number.isFinite)) return { empty: true, profile: p };
+  if (p.age < 7 || p.age > 99) return { error: '나이는 만 7~99세 사이로 입력해 주세요.', profile: p };
+  if (p.height < 100 || p.height > 230) return { error: '키는 100~230cm 사이로 입력해 주세요.', profile: p };
+  if (p.weight < 15 || p.weight > 250) return { error: '체중은 15~250kg 사이로 입력해 주세요.', profile: p };
+  return { profile: p };
+}
+
+// 기초대사량(Mifflin-St Jeor) → 하루 필요 열량 → 한 끼 목표
+function calcTarget(p) {
+  const bmr = 10 * p.weight + 6.25 * p.height - 5 * p.age + (p.sex === 'm' ? 5 : -161);
+  const tdee = bmr * ACTIVITY[p.activity];
+  const goal = GOALS[p.goal];
+  const meal = tdee / MEALS_PER_DAY;
+  const dayProt = tdee * goal.ratio.prot / 100 / 4;
+  return {
+    bmr, tdee, goal, age: p.age, goalKey: p.goal, activity: p.activity,
+    protPerKg: dayProt / p.weight,
+    meal: {
+      kcal: meal,
+      carb: meal * goal.ratio.carb / 100 / 4,
+      prot: meal * goal.ratio.prot / 100 / 4,
+      fat: meal * goal.ratio.fat / 100 / 9
+    }
+  };
+}
+
+// 숫자 → '1,568'
+function fmt(n) { return Math.round(n).toLocaleString('ko-KR'); }
+
+/* ===================== 날짜 도우미 ===================== */
+// Date → 'YYYY-MM-DD' (화면용, 내 컴퓨터 시간 기준)
+function toIso(d) {
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return d.getFullYear() + '-' + m + '-' + day;
+}
+// 'YYYY-MM-DD' → 'YYYYMMDD' (API용)
+function isoToYmd(iso) { return iso.replace(/-/g, ''); }
+// 'YYYYMMDD' → '11월 2일 (월)'
+function ymdLabel(ymd) {
+  const d = new Date(+ymd.slice(0, 4), +ymd.slice(4, 6) - 1, +ymd.slice(6, 8));
+  const w = ['일', '월', '화', '수', '목', '금', '토'][d.getDay()];
+  return (d.getMonth() + 1) + '월 ' + d.getDate() + '일 (' + w + ')';
+}
+
+/* ===================== 응답 해석 ===================== */
+// '<br/>'로 나누기
+function splitBr(text) {
+  return String(text || '').split(/<br\s*\/?>/i).map(s => s.trim()).filter(Boolean);
+}
+
+// DDISH_NM → [{ name, nums:[5,6,13] }]
+function parseMenu(ddish) {
+  return splitBr(ddish).map(line => {
+    const m = line.match(/^(.*?)\s*\(([\d.]+)\)\s*$/); // 끝의 (5.6.13)만 분리
+    if (!m) return { name: line, nums: [] };
+    const nums = m[2].split('.').map(Number).filter(n => n > 0);
+    return { name: m[1], nums };
+  });
+}
+
+// NTR_INFO → [{ label:'탄수화물(g)', value:123.4 }]
+function parseNutrition(ntr) {
+  return splitBr(ntr).map(line => {
+    const i = line.indexOf(':');
+    if (i < 0) return null;
+    const label = line.slice(0, i).trim();
+    const value = parseFloat(line.slice(i + 1));
+    return Number.isFinite(value) ? { label, value } : null;
+  }).filter(Boolean);
+}
+
+// 영양소 이름으로 값 찾기 (예: '탄수화물')
+function findNutri(list, name) {
+  const hit = list.find(n => n.label.startsWith(name));
+  return hit ? hit.value : null;
+}
+
+// CAL_INFO '850.5 Kcal' → 850.5
+function parseKcal(cal) {
+  const v = parseFloat(cal);
+  return Number.isFinite(v) ? v : null;
+}
+
+/* ===================== API 요청 ===================== */
+// 요청 주소 만들기 (URLSearchParams)
+function buildUrl(dateIso, pIndex) {
+  const p = new URLSearchParams({
+    KEY: CONFIG.API_KEY,
+    Type: 'json',
+    pIndex: String(pIndex),
+    pSize: String(CONFIG.PAGE_SIZE),
+    ATPT_OFCDC_SC_CODE: CONFIG.ATPT_OFCDC_SC_CODE,
+    SD_SCHUL_CODE: CONFIG.SD_SCHUL_CODE,
+    MLSV_YMD: isoToYmd(dateIso)   // 조회할 급식일자 (식사구분은 보내지 않고 화면에서 골라 보여 줌)
+  });
+  return CONFIG.BASE_URL + '?' + p.toString();
+}
+
+// 한 쪽을 받아 해석한다. 반환: { code, message, total, rows }
+async function fetchPage(dateIso, pIndex) {
+  const res = await fetch(buildUrl(dateIso, pIndex));
+  if (!res.ok) throw new Error('HTTP ' + res.status);
+  const json = await res.json();
+
+  // 데이터가 없거나 오류이면 최상위에 RESULT만 온다
+  if (json.RESULT) {
+    return { code: json.RESULT.CODE, message: json.RESULT.MESSAGE, total: 0, rows: [] };
+  }
+  const data = json.mealServiceDietInfo;
+  if (!Array.isArray(data) || data.length < 1) {
+    return { code: 'UNKNOWN', message: '응답 형식을 알 수 없습니다.', total: 0, rows: [] };
+  }
+  const head = data[0].head || [];
+  const total = (head[0] && head[0].list_total_count) || 0;
+  const result = (head[1] && head[1].RESULT) || {};
+  const rows = (data[1] && data[1].row) || [];
+  return { code: result.CODE || 'INFO-000', message: result.MESSAGE || '', total, rows };
+}
+
+// 전체 건수만큼 pIndex를 올려 이어 받기 (최대 MAX_PAGES쪽)
+async function fetchAll(dateIso) {
+  const first = await fetchPage(dateIso, 1);
+  if (first.code !== 'INFO-000') return first;
+  let rows = first.rows.slice();
+  let page = 1;
+  while (rows.length < first.total && page < CONFIG.MAX_PAGES) {
+    page += 1;
+    const next = await fetchPage(dateIso, page);
+    if (next.code !== 'INFO-000' || next.rows.length === 0) break;
+    rows = rows.concat(next.rows);
+  }
+  return { code: first.code, message: first.message, total: first.total, rows, pages: page };
+}
+
+/* ===================== 화면 그리기 ===================== */
+const $ = id => document.getElementById(id);
+
+// 요소 만들기 (API 글자는 textContent로만 넣어 안전하게)
+function el(tag, props, ...kids) {
+  const e = document.createElement(tag);
+  if (props) for (const k in props) {
+    if (k === 'class') e.className = props[k];
+    else if (k === 'style') e.style.cssText = props[k];
+    else e.setAttribute(k, props[k]);
+  }
+  kids.forEach(k => e.append(k));
+  return e;
+}
+
+function showNotice(title, text, isError) {
+  const box = el('div', { class: 'notice' + (isError ? ' error' : '') }, el('strong', null, title), text);
+  $('status').replaceChildren(box);
+  $('result').replaceChildren();
+  lastRows = null;
+}
+
+// 목표와 실제 차이: kind = same(비슷함) / more(많음) / less(적음)
+function statusOf(actual, goal) {
+  const d = actual - goal;
+  const kind = Math.abs(d / goal * 100) <= SIMILAR_PCT ? 'same' : d > 0 ? 'more' : 'less';
+  return { d, kind, shown: Math.round(Math.abs(d)) };
+}
+const STATUS_MARK = { same: '✓', more: '▲', less: '▼' };
+
+// 영양 칸 하나: 이름 / 이번 급식 값 / (목표가 있으면) 목표·막대·차이
+function tile(it) {
+  const t = el('div', { class: 'tile' });
+  t.append(el('div', { class: 'tile-name' }, el('span', { class: 'dot', style: 'background:' + it.color }), it.name));
+  t.append(el('div', { class: 'tile-val' }, el('b', null, it.actual === null ? '-' : fmt(it.actual)), ' ' + it.unit));
+  if (it.goal === undefined) return t;
+  t.append(el('div', { class: 'tile-goal' }, '내 목표 ' + fmt(it.goal) + ' ' + it.unit));
+  if (it.actual === null) return t;
+
+  const st = statusOf(it.actual, it.goal);
+  const scale = Math.max(it.actual, it.goal) * 1.15;          // 막대 전체 길이 기준
+  const pct = v => (v / scale * 100).toFixed(2) + '%';
+  const gauge = el('div', { class: 'gauge', role: 'img',
+    'aria-label': it.name + ' 목표 ' + fmt(it.goal) + ' ' + it.unit + ' 중 ' + fmt(it.actual) + ' ' + it.unit });
+  gauge.append(
+    el('span', { class: 'fill', style: 'width:' + pct(it.actual) + ';background:' + it.color }),
+    el('span', { class: 'band', style: 'left:' + pct(it.goal * (1 - SIMILAR_PCT / 100)) + ';width:' + pct(it.goal * 2 * SIMILAR_PCT / 100) }),
+    el('span', { class: 'tick', style: 'left:' + pct(it.goal) }));
+  t.append(gauge);
+  const text = st.kind === 'same' ? '비슷함'
+    : (st.d > 0 ? '+' : '−') + st.shown.toLocaleString('ko-KR') + ' ' + it.unit + (st.kind === 'more' ? ' 많음' : ' 적음');
+  t.append(el('span', { class: 'pill ' + st.kind }, STATUS_MARK[st.kind] + ' ' + text));
+  return t;
+}
+
+// 한 줄 요약: "탄수화물은 17 g 많아요. 열량·단백질·지방은 목표와 비슷해요."
+function summaryText(items) {
+  const diff = [], same = [];
+  items.forEach(it => {
+    if (it.actual === null) return;
+    const st = statusOf(it.actual, it.goal);
+    if (st.kind === 'same') same.push(it.name);
+    else diff.push({ it, st });
+  });
+  if (!diff.length) return same.length ? same.join('·') + '은 모두 내 목표와 비슷해요.' : '';
+  const parts = diff.map((x, i) => {
+    const last = i === diff.length - 1, more = x.st.kind === 'more';
+    return x.it.name + '은 ' + x.st.shown.toLocaleString('ko-KR') + ' ' + x.it.unit + ' ' + (more ? (last ? '많아요' : '많고') : (last ? '적어요' : '적고'));
+  });
+  return parts.join(', ') + '.' + (same.length ? ' ' + same.join('·') + '은 목표와 비슷해요.' : '');
+}
+
+// 내 목표가 있을 때: 목표와 비교
+function renderCompare(kcal, carb, prot, fat) {
+  const T = TARGET, m = T.meal;
+  const items = [
+    { name: '열량', actual: kcal, goal: m.kcal, unit: 'kcal', color: 'var(--ink-2)' },
+    { name: '탄수화물', actual: carb, goal: m.carb, unit: 'g', color: RANGE.carb.color },
+    { name: '단백질', actual: prot, goal: m.prot, unit: 'g', color: RANGE.prot.color },
+    { name: '지방', actual: fat, goal: m.fat, unit: 'g', color: RANGE.fat.color }
+  ];
+  const box = el('div', { class: 'compare' });
+  box.append(el('div', { class: 'cmp-head' },
+    el('h3', null, '내 한 끼 목표와 비교'),
+    el('span', { class: 'chip' }, T.goal.name + ' · 한 끼 ' + fmt(m.kcal) + ' kcal')));
+  const sum = summaryText(items);
+  if (sum) box.append(el('p', { class: 'cmp-sum' }, sum));
+  const grid = el('div', { class: 'tiles' });
+  items.forEach(it => grid.append(tile(it)));
+  box.append(grid);
+  box.append(el('p', { class: 'fine' },
+    '막대의 검은 선이 내 목표, 연한 띠가 목표의 ±' + SIMILAR_PCT + '% 범위입니다. 목표는 하루 필요 열량을 ' + MEALS_PER_DAY +
+    '끼로 똑같이 나눈 값입니다.'));
+  return box;
+}
+
+// 내 목표가 없을 때: 이번 급식의 값만 보여 줌
+function renderSimple(kcal, carb, prot, fat) {
+  const items = [
+    { name: '열량', actual: kcal, unit: 'kcal', color: 'var(--ink-2)' },
+    { name: '탄수화물', actual: carb, unit: 'g', color: RANGE.carb.color },
+    { name: '단백질', actual: prot, unit: 'g', color: RANGE.prot.color },
+    { name: '지방', actual: fat, unit: 'g', color: RANGE.fat.color }
+  ];
+  const box = el('div', { class: 'compare' }, el('div', { class: 'cmp-head' }, el('h3', null, '영양 정보')));
+  const grid = el('div', { class: 'tiles', style: 'margin-top:10px' });
+  items.forEach(it => grid.append(tile(it)));
+  box.append(grid);
+  box.append(el('p', { class: 'fine' }, '위의 "내 한 끼 목표"를 입력하면 이 급식을 내 목표와 비교하고, 어울리는 학교 운동도 추천해 드립니다.'));
+  return box;
+}
+
+/* ===================== 로컬 게임 데이터 ===================== */
+const GAME_KEY = 'gsik-game-v1';
+const GAME = { xp: 0, actions: [], activeDays: [], badges: [], participation: {}, discoveredMenus: [] };
+function loadGame() {
+  try {
+    const x = JSON.parse(localStorage.getItem(GAME_KEY) || '{}');
+    GAME.xp = Number.isFinite(x.xp) ? Math.max(0, x.xp) : 0;
+    GAME.actions = Array.isArray(x.actions) ? x.actions : [];
+    GAME.activeDays = Array.isArray(x.activeDays) ? x.activeDays : [];
+    GAME.badges = Array.isArray(x.badges) ? x.badges : [];
+    GAME.participation = x.participation && typeof x.participation === 'object' ? x.participation : {};
+    GAME.discoveredMenus = Array.isArray(x.discoveredMenus) ? x.discoveredMenus : [];
+  } catch (e) { /* 저장값이 없으면 새로 시작 */ }
+}
+function saveGame() {
+  try { localStorage.setItem(GAME_KEY, JSON.stringify(GAME)); } catch (e) { /* 저장이 막혀도 현재 화면은 동작 */ }
+}
+function dateKey(row) { return String(row.MLSV_YMD || '').replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3'); }
+function addActiveDay(day) {
+  if (!GAME.activeDays.includes(day)) GAME.activeDays.push(day);
+  GAME.activeDays.sort();
+}
+function currentStreak() {
+  const days = new Set(GAME.activeDays), d = new Date();
+  if (!days.has(toIso(d))) d.setDate(d.getDate() - 1);
+  let n = 0;
+  while (days.has(toIso(d))) { n++; d.setDate(d.getDate() - 1); }
+  return n;
+}
+function updateBadges() {
+  const all = Object.keys(STORE.reviews || {}).length;
+  if (all >= 1 && !GAME.badges.includes('첫 기록')) GAME.badges.push('첫 기록');
+  const vegDays = new Set(GAME.actions.filter(x => x.includes('|quest-veg|')).map(x => x.split('|')[0]));
+  if (vegDays.size >= 5 && !GAME.badges.includes('채소 퀘스트 5일')) GAME.badges.push('채소 퀘스트 5일');
+  const proteinDays = new Set(GAME.actions.filter(x => x.includes('|protein-menu|')).map(x => x.split('|')[0]));
+  if (proteinDays.size >= 3 && !GAME.badges.includes('단백질 메뉴 3회 기록')) GAME.badges.push('단백질 메뉴 3회 기록');
+  if (GAME.discoveredMenus.length >= 5 && !GAME.badges.includes('새 메뉴 탐험가')) GAME.badges.push('새 메뉴 탐험가');
+  if (GAME.xp >= 100 && !GAME.badges.includes('꾸준한 탐험가')) GAME.badges.push('꾸준한 탐험가');
+}
+function renderGamePanel() {
+  const level = Math.floor(GAME.xp / 100) + 1, within = GAME.xp % 100;
+  const panel = $('gamePanel');
+  panel.replaceChildren(
+    el('div', { class:'game-top' }, el('span', { class:'game-level' }, '레벨 ' + level + ' · 모험가'), el('strong', null, GAME.xp + ' XP')),
+    el('div', { class:'xp-track', role:'img', 'aria-label':'다음 레벨까지 ' + (100-within) + ' XP' }, el('div', { class:'xp-fill', style:'width:' + within + '%' })),
+    el('p', { class:'fine' }, '다음 레벨까지 ' + (100-within) + ' XP · 연속 기록 ' + currentStreak() + '일 · XP는 오늘 활동에 지급'),
+    el('div', { class:'badge-list' }, ...(GAME.badges.length ? GAME.badges.map(b => el('span',{class:'badge-item'}, '🏅 ' + b)) : [el('span',{class:'fine'},'첫 퀘스트를 완료하고 첫 배지를 모아 보세요.')]))
+  );
+}
+function awardXP(action, amount, day, category) {
+  if (day !== toIso(new Date())) return false; // XP는 실제 오늘 활동에만 지급
+  if (GAME.actions.includes(action)) return false;
+  if (category === 'participation') {
+    const used = Number(GAME.participation[day] || 0);
+    const gain = Math.min(amount, Math.max(0, 10-used));
+    if (!gain) return false;
+    GAME.participation[day] = used + gain;
+    amount = gain;
+  }
+  GAME.actions.push(action); GAME.xp += amount; addActiveDay(day);
+  updateBadges(); saveGame(); renderGamePanel();
+  return true;
+}
+function todayExerciseKinds(day) {
+  const kinds = new Set();
+  GAME.actions.forEach(a => { if (a.startsWith(day + '|exercise|')) kinds.add(a.split('|')[3]); });
+  return kinds;
+}
+function maybeExerciseBonus(day) {
+  const kinds = todayExerciseKinds(day);
+  if (['cardio','strength','flex'].every(k => kinds.has(k))) awardXP(day + '|exercise-balance-bonus', 20, day);
+}
+
+/* ===================== 학교 운동 추천 ===================== */
+// kind: cardio 유산소 / strength 근력 / flex 스트레칭
+// power: 강도 1(가벼움) ~ 3(힘듦)   slots: 어느 식사 뒤에 추천할지 (lunch 중식, dinner 석식)
+// dose: min 분 / reps 회×세트 / sec 초×세트 / interval / circuit / fixed(문구 그대로)
+const BOTH = ['lunch', 'dinner'], LUNCH = ['lunch'];
+const EXERCISES = [
+  { name: '운동장 빠르게 걷기', kind: 'cardio', power: 1, place: '운동장·복도', slots: BOTH, dose: 'min' },
+  { name: '제자리 걷기', kind: 'cardio', power: 1, place: '교실·복도', slots: BOTH, dose: 'min', cap: 5 },
+  { name: '계단 오르내리기', kind: 'cardio', power: 2, place: '계단', slots: BOTH, dose: 'min', cap: 10 },
+  { name: '가볍게 달리기 (대화할 수 있는 속도)', kind: 'cardio', power: 2, place: '운동장', slots: LUNCH, dose: 'min' },
+  { name: '배드민턴·탁구', kind: 'cardio', power: 2, place: '체육관·운동장', slots: LUNCH, dose: 'min' },
+  { name: '줄넘기', kind: 'cardio', power: 3, place: '운동장·체육관', slots: LUNCH, dose: 'min', cap: 15 },
+  { name: '인터벌 달리기', kind: 'cardio', power: 3, place: '운동장', slots: LUNCH, dose: 'interval' },
+  { name: '농구·족구·피구', kind: 'cardio', power: 3, place: '운동장·체육관', slots: LUNCH, dose: 'min' },
+  { name: '벽 짚고 푸시업', kind: 'strength', power: 1, place: '교실·복도', slots: BOTH, dose: 'reps' },
+  { name: '발뒤꿈치 들기', kind: 'strength', power: 1, place: '교실', slots: BOTH, dose: 'reps' },
+  { name: '의자 스쿼트 (앉았다 일어서기)', kind: 'strength', power: 2, place: '교실', slots: BOTH, dose: 'reps' },
+  { name: '플랭크', kind: 'strength', power: 2, place: '체육관·교실', slots: BOTH, dose: 'sec' },
+  { name: '런지', kind: 'strength', power: 2, place: '운동장·체육관', slots: LUNCH, dose: 'reps' },
+  { name: '푸시업 (무릎 대고도 가능)', kind: 'strength', power: 2, place: '체육관·교실', slots: LUNCH, dose: 'reps' },
+  { name: '맨몸 서킷 (스쿼트·런지·푸시업·플랭크)', kind: 'strength', power: 3, place: '체육관·운동장', slots: LUNCH, dose: 'circuit' },
+  { name: '목·어깨·허리 스트레칭', kind: 'flex', power: 1, place: '교실', slots: BOTH, dose: 'fixed', fixed: '20~30초씩 3동작' },
+  { name: '다리·종아리 스트레칭', kind: 'flex', power: 1, place: '교실·복도', slots: BOTH, dose: 'fixed', fixed: '20~30초씩 3동작' },
+  { name: '가벼운 요가 (고양이-소, 아기 자세)', kind: 'flex', power: 1, place: '체육관·교실', slots: BOTH, dose: 'fixed', fixed: '1~2분' }
+];
+const KIND_NAME = { cardio: '유산소', strength: '근력', flex: '스트레칭' };
+const ACT_LEVEL = { sed: 1, light: 2, mid: 3, high: 4 };   // 활동량 → 1~4단계
+const REPS = ['', '8~10회 × 2세트', '10~12회 × 2세트', '12~15회 × 3세트', '15~20회 × 3세트'];
+const SECS = ['', '20초 × 2세트', '30초 × 2세트', '40초 × 3세트', '60초 × 3세트'];
+// 목표별로 유산소·근력·스트레칭을 몇 개씩 고를지
+const MIX = {
+  keep: { cardio: 1, strength: 1, flex: 1 },
+  lose: { cardio: 2, strength: 1, flex: 1 },
+  gain: { strength: 2, cardio: 1, flex: 1 }
+};
+const GOAL_NOTE = {
+  keep: '유산소·근력·스트레칭을 골고루 담았어요.',
+  lose: '유산소·근력·스트레칭을 골고루 담았어요.',
+  gain: '유산소·근력·스트레칭을 골고루 담았어요.'
+};
+
+// 운동 하나의 양 (활동량 단계 1~4, extraMin은 걷기 등에 더하는 분)
+function doseText(ex, level, extraMin, slot, many) {
+  switch (ex.dose) {
+    case 'fixed': return ex.fixed;
+    case 'reps': return REPS[level];
+    case 'sec': return SECS[level];
+    case 'interval': return level >= 4 ? '30초 빠르게 + 60초 걷기 × 8회' : '30초 빠르게 + 60초 걷기 × 6회';
+    case 'circuit': return '4동작 × 30초씩, ' + (level >= 4 ? 3 : 2) + '바퀴';
+    default: {
+      // 석식 뒤에는 15분까지, 유산소를 두 가지 고르면 각각 15분까지 (점심시간이 짧아서)
+      const cap = Math.min(ex.cap || 30, slot === 'dinner' || many ? 15 : 30);
+      return Math.min([0, 10, 15, 20, 25][level] + extraMin, cap) + '분';
+    }
+  }
+}
+
+// 식사 종류·목표·활동량·급식 영양에 맞춰 운동 고르기
+// 반환: { slot, picks:[{ex, dose}], notes:[문장] }
+function recommendExercise(mealCode, T, kcal, carb, prot, fat) {
+  const slot = mealCode === '3' ? 'dinner' : 'lunch';
+  const level = ACT_LEVEL[T.activity] || 3;
+  const m = T.meal;
+  const st = {
+    kcal: kcal === null ? null : statusOf(kcal, m.kcal).kind,
+    carb: statusOf(carb, m.carb).kind,
+    prot: statusOf(prot, m.prot).kind,
+    fat: statusOf(fat, m.fat).kind
+  };
+  const adult = T.age >= 19;
+  const notes = [GOAL_NOTE[T.goalKey]];
+
+  // 강도 상한: 석식 뒤에는 중간까지, 에너지가 모자라 보이면 중간까지
+  let maxPower = slot === 'dinner' ? 2 : 3;
+  let extraMin = 0;
+  if (st.carb === 'less') {
+    maxPower = Math.min(maxPower, 2);
+    notes.push('탄수화물이 목표보다 적어 힘이 모자랄 수 있어요. 강도를 낮춰 가볍게 구성했어요.');
+  } else {
+    notes.push('탄수화물이 목표 이상이라 몸을 움직일 에너지로 쓰기 좋아요.');
+  }
+  if (st.kcal === 'less') {
+    maxPower = Math.min(maxPower, 2);
+    notes.push('열량이 목표보다 적어 강도를 낮췄어요. 다음 끼니나 간식으로 채워 주세요.');
+  } else if (st.kcal === 'more' && adult) {
+    extraMin = 5;
+  }
+  if (st.prot === 'less') {
+    notes.push('단백질이 목표보다 적어요. 근력 운동은 무리하지 말고, 운동 뒤 우유·두부·계란 같은 단백질 간식을 챙겨 보세요.');
+  } else {
+    notes.push('단백질이 충분해서 근력 운동과 잘 맞아요.');
+  }
+  if (st.fat === 'more') notes.push('기름진 메뉴가 많은 편이라 식후에 충분히 쉬었다가 천천히 시작하세요.');
+
+  // 활동량 단계에 맞는 강도 (거의 안 움직임=1, 가벼운 활동·보통=2, 활발=3)
+  const aim = Math.min(maxPower, level <= 1 ? 1 : level <= 3 ? 2 : 3);
+  const picks = [];
+  for (const kind of ['cardio', 'strength', 'flex']) {
+    const many = (MIX[T.goalKey][kind] || 0) > 1;
+    EXERCISES.filter(e => e.kind === kind && e.slots.includes(slot) && e.power <= aim)
+      .sort((a, b) => b.power - a.power)            // 목표 강도에 가까운 것부터
+      .slice(0, MIX[T.goalKey][kind] || 0)
+      .forEach(ex => picks.push({ ex, many, dose: doseText(ex, level, ex.kind === 'cardio' ? extraMin : 0, slot, many) }));
+  }
+  // 걷기 시간이 실제로 늘어난 경우에만 알려 준다
+  if (extraMin && picks.some(x => x.ex.kind === 'cardio' && x.dose !== doseText(x.ex, level, 0, slot, x.many))) {
+    notes.push('열량이 목표보다 높아 유산소 시간을 5분 늘렸어요.');
+  }
+  return { slot, picks, notes };
+}
+
+// 운동 추천 카드
+function renderExercise(mealCode, kcal, carb, prot, fat) {
+  const day = dateKey({ MLSV_YMD: $('mealDate').value.replace(/-/g, '') });
+  const picks = [
+    { name:'운동장 빠르게 걷기', kind:'cardio', place:'운동장·복도', dose:'10분' },
+    { name:'벽 짚고 푸시업', kind:'strength', place:'교실·복도', dose:'8~10회 × 2세트' },
+    { name:'목·어깨·다리 스트레칭', kind:'flex', place:'교실', dose:'편안하게 20~30초씩' }
+  ];
+  const box = el('div', { class:'exercise' });
+  box.append(el('div', { class:'cmp-head' }, el('h3', null, '오늘의 움직임 카드'), el('span', { class:'chip' }, '컨디션에 맞게 선택')));
+  const ul = el('ul', { class:'ex-list' });
+  picks.forEach(ex => {
+    const action = day + '|exercise|' + ex.name + '|' + ex.kind;
+    const done = GAME.actions.includes(action);
+    const btn = el('button', { type:'button', class:'game-action', disabled:String(done) }, done ? '완료 ✓' : '완료 · +15 XP');
+    btn.addEventListener('click', () => {
+      if (awardXP(action, 15, day)) { btn.disabled = true; btn.textContent = '완료 ✓'; }
+      maybeExerciseBonus(day);
+    });
+    ul.append(el('li', { class:'ex' },
+      el('span', { class:'ex-name' }, ex.name),
+      el('span', { class:'ex-meta' }, el('span', { class:'tag' }, KIND_NAME[ex.kind]), ex.place),
+      el('span', { class:'ex-dose' }, ex.dose), btn));
+  });
+  box.append(ul);
+  box.append(el('p', { class:'fine' }, '세 종류를 하루에 모두 완료하면 +20 XP 보너스! 몸 상태에 맞춰 쉬거나 강도를 조절해도 괜찮아요. 운동은 먹은 것을 보상하거나 없애기 위한 것이 아닙니다.'));
+  box.append(el('p', { class:'fine' }, '메뉴를 5가지 기록하면 새 메뉴 탐험가 배지, 단백질 식품을 3일 기록하면 단백질 메뉴 배지를 받을 수 있어요. 섭취량을 적게 기록할수록 점수가 올라가지는 않습니다.'));
+  return box;
+}
+
+/* ===================== 오늘 급식 맞춤 가이드 ===================== */
+// 메뉴 이름에 들어 있는 낱말로 먹는 팁을 고른다. 위에 있는 규칙이 먼저 적용된다.
+// text: 누구에게나 보여 주는 팁 / trim: 만 19세 이상이고 열량이 목표보다 높을 때만 덧붙이는 팁
+// heavy: 열량이 높기 쉬운 메뉴 (맨 위 한 줄 안내에 이름이 나옴)
+const MENU_RULES = [
+  { id: 'meat', re: /제육|불고기|두루치기|보쌈|수육|족발|삼겹|갈비|함박|스테이크/, heavy: true,
+    text: '고기 반찬은 단백질을 챙기기 좋아요. 쌈·김치·나물 같은 채소와 함께 먹으면 균형이 맞아요.',
+    trim: '기름과 양념이 많은 편이라 밥을 조금 덜면 열량을 맞추기 좋아요.' },
+  { id: 'fried', re: /튀김|까스|가스|커틀릿|탕수육|치킨|너겟|강정|프라이|고로케|핫도그|부침|동그랑땡|감자전|김치전|해물전|파전|호박전|부추전/, heavy: true,
+    text: '튀김은 기름을 많이 머금고 있어요. 소스는 찍어 먹고 채소 반찬을 같이 드세요.',
+    trim: '튀김옷을 조금 벗겨 먹으면 열량을 줄일 수 있어요.' },
+  { id: 'onedish', re: /볶음밥|덮밥|비빔밥|오므라이스|카레|리조또|김밥|주먹밥|컵밥|초밥|짜장밥|짬뽕밥|잡채밥|국밥/, heavy: true,
+    text: '한 그릇 음식은 채소와 단백질이 부족하기 쉬워요. 같이 나온 반찬과 국을 골고루 챙기세요.',
+    trim: '밥 양을 조금 줄이고 반찬을 더 챙기는 것도 방법이에요.' },
+  { id: 'noodle', re: /국수|라면|우동|짜장|짬뽕|파스타|스파게티|칼국수|쫄면|냉면|수제비|떡국|떡볶이|라볶이|만두|볶음면|비빔면/, heavy: true,
+    text: '면·떡 종류는 탄수화물이 많아요. 계란·고기·두부 같은 단백질 반찬과 채소를 함께 드세요.',
+    trim: '밥까지 가득 먹으면 탄수화물이 겹치니 밥을 조금 덜어 보세요.' },
+  { id: 'soup', re: /(?:국|탕|찌개|전골)(?:\([^)]*\))?$/,
+    text: '국물에는 나트륨이 많을 수 있어요. 건더기 위주로 드시고 국물은 적당히 드세요.' },
+  { id: 'processed', re: /소시지|소세지|^햄|햄볶음|베이컨|어묵|오뎅|비엔나|스팸|맛살/,
+    text: '가공식품은 나트륨이 많은 편이에요. 국물이나 짠 반찬과 겹치지 않게 드세요.' },
+  { id: 'spicy', re: /매콤|매운|불닭|마라|얼큰|청양|닭갈비|닭발|쭈꾸미/,
+    text: '매운 메뉴는 속이 쓰릴 수 있어요. 천천히 먹고 물을 함께 마시세요.' },
+  { id: 'sweet', re: /푸딩|케이크|쿠키|아이스크림|젤리|주스|음료|에이드|빵|도넛|와플|초코|파르페|슈크림|마카롱|약과/,
+    text: '단 후식은 한 번에 다 먹기보다 천천히 나눠 먹어도 좋아요. 먹은 뒤에는 양치도 잊지 마세요.' },
+  { id: 'fish', re: /생선|고등어|갈치|조기|삼치|연어|꽁치|동태|명태|가자미|임연수|장어|대구|코다리|아귀|병어/,
+    text: '생선은 단백질과 좋은 지방이 풍부해요. 가시만 조심해서 드세요.' },
+  { id: 'protein', re: /계란|달걀|두부|에그|오믈렛|스크램블/,
+    text: '단백질을 챙기기 좋은 메뉴예요. 성장과 근육에 도움이 돼요.' },
+  { id: 'dairy', re: /우유|요구르트|요거트|요플레|치즈/,
+    text: '칼슘이 풍부해서 뼈 건강에 좋아요. 성장기에는 특히 챙겨 먹으면 좋아요.' },
+  { id: 'grain', re: /잡곡|현미|보리|흑미|귀리|수수|기장|콩밥/,
+    text: '잡곡은 식이섬유가 있어 포만감이 오래가요.' },
+  { id: 'fruit', re: /^(?:사과|배|귤|감|포도|바나나|딸기|수박|참외|키위|오렌지|방울토마토|토마토|망고|복숭아|자두|파인애플|멜론|감귤|한라봉|과일|과일샐러드)(?:\(|\s|$)/,
+    text: '과일은 비타민과 식이섬유를 챙기기 좋아요.' },
+  { id: 'veg', re: /김치|나물|샐러드|겉절이|무침|쌈|생채|채소|야채|시금치|콩나물|브로콜리/,
+    text: '채소 반찬을 먼저 먹으면 포만감이 좋고 소화에 도움이 돼요.' }
+];
+const MAX_TIPS = 5;
+
+// 낱말 끝 글자에 받침이 있는지에 따라 '이/가' 같은 조사를 붙인다
+function josa(word, withBatchim, without) {
+  const hangul = (word.match(/[가-힣]/g) || []).pop();
+  if (!hangul) return withBatchim;
+  return (hangul.charCodeAt(0) - 0xAC00) % 28 ? withBatchim : without;
+}
+
+// 메뉴 목록 → { tips:[{tag,text}], heavyName }
+function menuTips(items, trim) {
+  const found = new Map();                 // 규칙 → 처음 걸린 메뉴 이름
+  items.forEach(it => {
+    const rule = MENU_RULES.find(r => r.re.test(it.name));
+    if (rule && !found.has(rule)) found.set(rule, it.name);
+  });
+  const ordered = MENU_RULES.filter(r => found.has(r)).slice(0, MAX_TIPS);
+  const heavyRule = ordered.find(r => r.heavy);
+  return {
+    tips: ordered.map(r => ({ tag: found.get(r), text: r.text + (trim && r.trim ? ' ' + r.trim : '') })),
+    heavyName: heavyRule ? found.get(heavyRule).replace(/\([^)]*\)/g, '').trim() : ''
+  };
+}
+
+// 내 목표와 비교한 영양 문구 (내 정보를 입력했을 때만)
+function nutrientLines(st, adult) {
+  const lines = [];
+  if (st.prot === 'less') lines.push('단백질이 목표보다 적어요. 고기·생선·계란·두부 반찬을 먼저 챙겨 보세요.');
+  if (st.carb === 'less') lines.push('탄수화물이 목표보다 적어요. 밥을 충분히 드세요. 오후에 쓸 에너지가 돼요.');
+  if (st.carb === 'more') lines.push(adult
+    ? '탄수화물이 목표보다 많아요. 밥을 조금 덜어 양을 맞춰 보세요.'
+    : '탄수화물이 목표보다 많아요. 채소와 단백질 반찬도 함께 챙겨 드세요.');
+  if (st.fat === 'more') lines.push('기름진 반찬은 한꺼번에 많이 먹기보다 채소와 번갈아 드세요.');
+  return lines;
+}
+
+// 맞춤 가이드 카드. n = { kcal, carb, prot, fat } (없으면 null)
+function renderGuide(row, n) {
+  const T = TARGET;
+  const adult = !!T && T.age >= 19;   // 만 19세 미만이거나 정보가 없으면 '줄이기' 안내는 하지 않는다
+  const st = {};
+  if (T) {
+    st.kcal = n.kcal === null ? null : statusOf(n.kcal, T.meal.kcal).kind;
+    ['carb', 'prot', 'fat'].forEach(k => { st[k] = n[k] === null ? null : statusOf(n[k], T.meal[k]).kind; });
+  }
+  const trim = adult && st.kcal === 'more';
+  const { tips, heavyName } = menuTips(parseMenu(row.DDISH_NM), trim);
+
+  let head;
+  if (trim) {
+    head = (heavyName ? heavyName + josa(heavyName, '이', '가') + ' 있어 ' : '') +
+      '열량이 내 한 끼 목표보다 높아요. 밥을 조금 줄이면 어때요?';
+  } else if (T && st.kcal === 'less') {
+    head = '열량이 내 한 끼 목표보다 적어요. 밥과 반찬을 골고루 충분히 드세요.';
+  } else {
+    head = tips.length ? '오늘 메뉴로 골고루 먹는 팁이에요.' : '오늘 메뉴는 골고루 드시면 돼요.';
+  }
+
+  const box = el('div', { class: 'guide' }, el('div', { class: 'cmp-head' }, el('h3', null, '오늘 급식 맞춤 가이드')));
+  box.append(el('p', { class: 'cmp-sum' }, head));
+  if (tips.length) {
+    const day = dateKey(row), key = mealKey(row);
+    const questTitle = tips.map(t => t.text);
+    const ul = el('ul', { class:'quest-list' });
+    questTitle.forEach((title, i) => {
+      const questType = /채소|야채|나물|김치|샐러드|무침/.test(title) ? 'quest-veg' : 'quest';
+      const action = day + '|' + questType + '|' + key + '|' + i;
+      const done = GAME.actions.includes(action);
+      const check = el('input', { type:'checkbox', checked:String(done) });
+      check.addEventListener('change', () => {
+        if (check.checked) {
+          if (!awardXP(action, 10, day)) check.checked = false;
+        } else { check.checked = true; }
+      });
+      ul.append(el('li', null, el('label', null, check, el('span', null, title + (done ? ' · 완료' : ' · +10 XP')))));
+    });
+    box.append(el('h4', null, '오늘의 퀘스트'));
+    box.append(ul);
+  }
+  const lines = T ? nutrientLines(st, adult) : [];
+  if (lines.length) {
+    const why = el('ul', { class: 'why' });
+    lines.forEach(l => why.append(el('li', null, l)));
+    box.append(why);
+  }
+  box.append(el('p', { class: 'fine' }, adult
+    ? '개인차가 있으니 참고만 하고, 몸 상태에 맞게 드세요.'
+    : '성장기에는 급식을 줄이기보다 골고루 충분히 먹는 것이 중요해요. 개인차가 있으니 참고만 하세요.'));
+  return box;
+}
+
+/* ===================== 평점·후기 (이 브라우저에 저장) ===================== */
+const REVIEW_KEY = 'gsik-reviews', FRIEND_KEY = 'gsik-friends', NICK_KEY = 'gsik-nick';
+const STORE = { reviews: {}, friends: [], nick: '' };  // 저장이 막혀도 이 변수로 동작
+const BAD_KEYS = ['__proto__', 'constructor', 'prototype'];
+
+function loadStore() {
+  try {
+    const r = JSON.parse(localStorage.getItem(REVIEW_KEY) || '{}');
+    const f = JSON.parse(localStorage.getItem(FRIEND_KEY) || '[]');
+    if (r && typeof r === 'object' && !Array.isArray(r)) STORE.reviews = r;
+    if (Array.isArray(f)) STORE.friends = f;
+    STORE.nick = String(localStorage.getItem(NICK_KEY) || '').slice(0, 12);
+  } catch (e) { /* 읽을 수 없으면 빈 상태로 시작 */ }
+}
+function saveStore() {
+  try {
+    localStorage.setItem(REVIEW_KEY, JSON.stringify(STORE.reviews));
+    localStorage.setItem(FRIEND_KEY, JSON.stringify(STORE.friends));
+    localStorage.setItem(NICK_KEY, STORE.nick);
+  } catch (e) { /* 저장이 막혀 있으면 새로고침 때 사라짐 */ }
+}
+
+// 급식 한 끼를 구분하는 이름표: 학교코드|날짜|식사코드
+function mealKey(row) { return CONFIG.SD_SCHUL_CODE + '|' + row.MLSV_YMD + '|' + row.MMEAL_SC_CODE; }
+function ensureReview(key) {
+  if (!STORE.reviews[key]) STORE.reviews[key] = { stars: 0, comment: '', dishes: {} };
+  if (!STORE.reviews[key].dishes) STORE.reviews[key].dishes = {};
+  return STORE.reviews[key];
+}
+const hasOwn = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
+
+// 친구들이 준 점수: { avg, n, comments:[{nick,text}] }
+function friendMealStats(key) {
+  let sum = 0, n = 0; const comments = [];
+  STORE.friends.forEach(f => {
+    const r = f.items && hasOwn(f.items, key) ? f.items[key] : null;
+    if (!r) return;
+    if (r.stars > 0) { sum += r.stars; n += 1; }
+    if (r.comment) comments.push({ nick: f.nick, text: r.comment });
+  });
+  return { avg: n ? sum / n : 0, n, comments };
+}
+// 메뉴 하나에 대한 친구들의 좋아요/별로 수 (모든 날짜 합)
+function friendDishCounts(name) {
+  let up = 0, down = 0;
+  STORE.friends.forEach(f => Object.keys(f.items || {}).forEach(k => {
+    const v = f.items[k].dishes && hasOwn(f.items[k].dishes, name) ? f.items[k].dishes[name] : 0;
+    if (v === 1) up += 1; else if (v === -1) down += 1;
+  }));
+  return { up, down };
+}
+
+// 메뉴 옆 '좋아요 / 별로예요' 버튼
+function voteGroup(key, name) {
+  const rec = STORE.reviews[key];
+  const cur = rec && hasOwn(rec.dishes || {}, name) ? rec.dishes[name] : 0;
+  const wrap = el('span', { class: 'vote' });
+  const up = el('button', { type: 'button', class: 'vbtn up', 'aria-pressed': String(cur === 1), 'aria-label': name + ' 좋아요' }, '좋아요');
+  const down = el('button', { type: 'button', class: 'vbtn down', 'aria-pressed': String(cur === -1), 'aria-label': name + ' 별로예요' }, '별로예요');
+  const press = dir => {
+    const r = ensureReview(key);
+    const now = hasOwn(r.dishes, name) ? r.dishes[name] : 0;
+    if (now === dir) delete r.dishes[name]; else r.dishes[name] = dir;
+    const v = hasOwn(r.dishes, name) ? r.dishes[name] : 0;
+    up.setAttribute('aria-pressed', String(v === 1));
+    down.setAttribute('aria-pressed', String(v === -1));
+    saveStore();
+    const day = String(key).split('|')[1].replace(/^(\d{4})(\d{2})(\d{2})$/, '$1-$2-$3');
+    awardXP(day + '|vote|' + name, 2, day, 'participation');
+    renderShare();
+  };
+  up.addEventListener('click', () => press(1));
+  down.addEventListener('click', () => press(-1));
+  wrap.append(up, down);
+  const fr = friendDishCounts(name);
+  if (fr.up || fr.down) wrap.append(el('span', { class: 'vote-fr' }, '친구 좋아요 ' + fr.up + ' · 별로 ' + fr.down));
+  return wrap;
+}
+
+// 평점·후기 카드: 별점 + 한줄 후기 + 친구 평균
+function renderReview(row) {
+  const key = mealKey(row);
+  const rec = STORE.reviews[key] || { stars: 0, comment: '' };
+  const box = el('div', { class: 'review' },
+    el('div', { class: 'cmp-head' }, el('h3', null, '내 평점·후기'), el('span', { class: 'chip' }, '이 기기에만 저장')));
+
+  const group = el('div', { class: 'stars', role: 'radiogroup', 'aria-label': '급식 별점' });
+  const btns = [];
+  const paint = v => btns.forEach((b, i) => {
+    const on = i < v;
+    b.textContent = on ? '★' : '☆';
+    b.classList.toggle('on', on);
+    b.setAttribute('aria-checked', String(i + 1 === v));
+  });
+  for (let n = 1; n <= 5; n++) {
+    const b = el('button', { type: 'button', class: 'star', role: 'radio', 'aria-label': n + '점' });
+    b.addEventListener('click', () => {
+      const r = ensureReview(key);
+      r.stars = r.stars === n ? 0 : n;      // 같은 별을 다시 누르면 취소
+      paint(r.stars); saveStore(); renderShare();
+      const day = dateKey(row);
+      awardXP(day + '|review|' + key, 5, day, 'participation');
+    });
+    btns.push(b); group.append(b);
+  }
+  paint(rec.stars || 0);
+  box.append(group);
+
+  const input = el('input', { type: 'text', maxlength: '60', placeholder: '한줄 후기 (예: 제육이 맛있었어요)', 'aria-label': '한줄 후기' });
+  input.value = rec.comment || '';
+  input.addEventListener('input', () => { ensureReview(key).comment = input.value.slice(0, 60); saveStore(); });
+  input.addEventListener('blur', () => { if (input.value.trim()) { const day = dateKey(row); awardXP(day + '|review|' + key, 5, day, 'participation'); } });
+  box.append(input);
+
+  const fs = friendMealStats(key);
+  if (fs.n || fs.comments.length) {
+    if (fs.n) box.append(el('p', { class: 'friend-line' }, '친구 평균 ★ ' + fs.avg.toFixed(1) + ' (' + fs.n + '명)'));
+    if (fs.comments.length) {
+      const ul = el('ul', { class: 'why' });
+      fs.comments.slice(0, 3).forEach(c => ul.append(el('li', null, c.nick + ': ' + c.text)));
+      box.append(ul);
+    }
+  }
+  box.append(el('p', { class: 'fine' }, '이름·학번 같은 개인정보는 쓰지 마세요.'));
+  return box;
+}
+
+// 가져온 글 검사: 문제가 있으면 { error }, 괜찮으면 { friend }
+function parseShare(text) {
+  const clean = v => String(v).replace(/<[^>]*>/g, '').replace(/[\u0000-\u001f<>]/g, '');   // 태그는 통째로 지운다
+  if (!text.trim()) return { error: '붙여 넣은 글이 없어요.' };
+  if (text.length > 200000) return { error: '글이 너무 길어요.' };
+  let obj;
+  try { obj = JSON.parse(text); } catch (e) { return { error: '친구가 보낸 글이 아니에요. 복사한 글 전체를 붙여 넣어 주세요.' }; }
+  if (!obj || obj.v !== 1 || !Array.isArray(obj.items)) return { error: '이 앱에서 만든 평점 글이 아니에요.' };
+  if (obj.school !== CONFIG.SD_SCHUL_CODE) return { error: '다른 학교의 평점이에요. 같은 학교 친구의 글만 가져올 수 있어요.' };
+  if (obj.items.length > 500) return { error: '평점이 너무 많아요.' };
+  const items = {};
+  for (const it of obj.items) {
+    if (!Array.isArray(it) || it.length !== 4) continue;
+    const [key, stars, comment, dishes] = it;
+    if (typeof key !== 'string' || !/^\d{1,10}\|\d{8}\|\d$/.test(key)) continue;
+    const d = {};
+    if (dishes && typeof dishes === 'object' && !Array.isArray(dishes)) {
+      Object.keys(dishes).slice(0, 20).forEach(name => {
+        if (name.length < 1 || name.length > 40 || BAD_KEYS.includes(name)) return;
+        if (dishes[name] === 1 || dishes[name] === -1) d[clean(name)] = dishes[name];
+      });
+    }
+    items[key] = {
+      stars: Number.isInteger(stars) && stars >= 0 && stars <= 5 ? stars : 0,
+      comment: typeof comment === 'string' ? clean(comment).slice(0, 60) : '',
+      dishes: d
+    };
+  }
+  const nick = clean(obj.nick || '익명').trim().slice(0, 12) || '익명';
+  return { friend: { nick, items, at: Date.now() } };
+}
+
+// 내 평점을 친구에게 보낼 글로 만든다
+function buildExport() {
+  const items = [];
+  Object.keys(STORE.reviews).forEach(k => {
+    const r = STORE.reviews[k];
+    if (r.stars || r.comment || Object.keys(r.dishes || {}).length) items.push([k, r.stars || 0, r.comment || '', r.dishes || {}]);
+  });
+  return { count: items.length, text: JSON.stringify({ v: 1, school: CONFIG.SD_SCHUL_CODE, nick: STORE.nick || '익명', items }) };
+}
+
+// 급식 카드를 다시 그린다 (친구 평점이 바뀌었을 때)
+function refreshCards() { if (lastRows) renderResult(lastRows); }
+
+// 공유 상자: 친구 목록 + 메뉴 호불호 순위
+function renderShare() {
+  const list = $('friendList');
+  list.replaceChildren();
+  STORE.friends.forEach((f, i) => {
+    const n = Object.keys(f.items || {}).length;
+    const del = el('button', { type: 'button', class: 'small', 'aria-label': f.nick + ' 평점 삭제' }, '삭제');
+    del.addEventListener('click', () => { STORE.friends.splice(i, 1); saveStore(); renderShare(); refreshCards(); });
+    list.append(el('div', { class: 'friend' }, el('span', null, f.nick + ' · 평점 ' + n + '건'), del));
+  });
+
+  // 내 투표 + 친구 투표를 합쳐 메뉴별로 센다
+  const tally = new Map();
+  const add = dishes => Object.keys(dishes || {}).forEach(name => {
+    const v = dishes[name];
+    if (v !== 1 && v !== -1) return;
+    const t = tally.get(name) || { up: 0, down: 0 };
+    if (v === 1) t.up += 1; else t.down += 1;
+    tally.set(name, t);
+  });
+  Object.keys(STORE.reviews).forEach(k => add(STORE.reviews[k].dishes));
+  STORE.friends.forEach(f => Object.keys(f.items || {}).forEach(k => add(f.items[k].dishes)));
+
+  const col = (title, arr, key) => {
+    const ol = el('ol');
+    arr.forEach(([name, t]) => ol.append(el('li', null, name + ' · 좋아요 ' + t.up + ' · 별로 ' + t.down)));
+    return el('div', null, el('h4', null, title), arr.length ? ol : el('p', { class: 'fine' }, '아직 없어요.'));
+  };
+  const all = [...tally.entries()];
+  const liked = all.filter(([, t]) => t.up > t.down).sort((a, b) => (b[1].up - b[1].down) - (a[1].up - a[1].down) || b[1].up - a[1].up).slice(0, 5);
+  const disliked = all.filter(([, t]) => t.down > t.up).sort((a, b) => (b[1].down - b[1].up) - (a[1].down - a[1].up) || b[1].down - a[1].down).slice(0, 5);
+  const rank = $('rank');
+  if (!all.length) {
+    rank.replaceChildren(el('p', { class: 'fine' }, '아직 호불호가 없어요. 급식 메뉴 옆의 "좋아요/별로예요"를 눌러 보세요.'));
+  } else {
+    rank.replaceChildren(col('인기 메뉴', liked), col('호불호가 갈리거나 별로인 메뉴', disliked));
+  }
+}
+
+// 공유 상자 버튼 연결
+function initShare() {
+  $('nick').value = STORE.nick;
+  $('nick').addEventListener('input', () => { STORE.nick = $('nick').value.replace(/[<>]/g, '').slice(0, 12); saveStore(); });
+
+  $('copyBtn').addEventListener('click', async () => {
+    const out = buildExport(), box = $('exportBox');
+    box.hidden = false; box.value = out.text;
+    if (!out.count) { $('exportMsg').textContent = '아직 보낼 평점이 없어요. 별점이나 후기를 먼저 남겨 보세요.'; return; }
+    try {
+      await navigator.clipboard.writeText(out.text);
+      $('exportMsg').textContent = '평점 ' + out.count + '건을 복사했어요. 친구에게 붙여 넣어 보내세요.';
+    } catch (e) {
+      box.focus(); box.select();   // 복사가 막히면 직접 복사하도록 선택해 둔다
+      $('exportMsg').textContent = '자동 복사가 막혔어요. 선택된 글을 직접 복사(Ctrl+C)해 주세요.';
+    }
+  });
+
+  $('importBtn').addEventListener('click', () => {
+    const r = parseShare($('importBox').value);
+    if (r.error) { $('importMsg').textContent = r.error; return; }
+    const f = r.friend, same = STORE.friends.findIndex(x => x.nick === f.nick);
+    if (same >= 0) STORE.friends[same] = f;       // 같은 닉네임이면 새 글로 바꿈
+    else if (STORE.friends.length >= 30) { $('importMsg').textContent = '친구는 30명까지 가져올 수 있어요. 목록에서 삭제한 뒤 다시 해 보세요.'; return; }
+    else STORE.friends.push(f);
+    saveStore();
+    $('importMsg').textContent = f.nick + ' 님의 평점 ' + Object.keys(f.items).length + '건을 가져왔어요.';
+    $('importBox').value = '';
+    renderShare(); refreshCards();
+  });
+  renderShare();
+}
+
+function renderNutrition(row) {
+  const list = parseNutrition(row.NTR_INFO);
+  const carb = findNutri(list, '탄수화물');
+  const prot = findNutri(list, '단백질');
+  const fat = findNutri(list, '지방');
+  const kcal = parseKcal(row.CAL_INFO);
+  if (carb === null || prot === null || fat === null) {
+    const miss = el('div', { class: 'nutri' }, el('p', { class: 'fine' }, '이 식단에는 탄수화물·단백질·지방 정보가 없습니다.'));
+    miss.append(renderGuide(row, { kcal, carb: null, prot: null, fat: null }));   // 메뉴 팁은 영양 정보 없이도 보여 줌
+    miss.append(renderExercise(row.MMEAL_SC_CODE, kcal, null, null, null));
+    return miss;
+  }
+  const box = el('div', { class: 'nutri' });
+  box.append(TARGET ? renderCompare(kcal, carb, prot, fat) : renderSimple(kcal, carb, prot, fat));
+  box.append(renderGuide(row, { kcal, carb, prot, fat }));
+  box.append(renderExercise(row.MMEAL_SC_CODE, kcal, carb, prot, fat));
+
+  // 그 밖의 영양소는 접어 둔다
+  const others = list.filter(n => !/^(탄수화물|단백질|지방)/.test(n.label));
+  if (others.length) {
+    const dl = el('dl');
+    others.forEach(n => { dl.append(el('dt', null, n.label), el('dd', null, String(n.value))); });
+    box.append(el('details', null, el('summary', null, '그 밖의 영양소 ' + others.length + '가지'), dl));
+  }
+  return box;
+}
+
+function renderIntake(row, items, kcal, carb, prot, fat) {
+  const key = mealKey(row), day = dateKey(row), rec = ensureMealLog(key);
+  const box = el('div', { class:'estimate' });
+  box.append(el('strong', null, '먹은 양 기록'));
+  box.append(el('p', { class:'fine' }, '메뉴마다 먹은 양을 선택하세요. 기록한 메뉴만 합산하며, 메뉴별 영양정보가 없어 한 끼 전체 수치를 메뉴 수로 나눈 추정치입니다.'));
+  let totalFactor = 0, selected = 0;
+  items.forEach((it, i) => {
+    const rowBox = el('div', { class:'portion-row' });
+    const label = el('label', null, it.name);
+    const select = el('select', { 'aria-label':it.name + ' 섭취량' });
+    [['','선택'],['1','다 먹음'],['0.5','반'],['0.25','조금']].forEach(([v,t]) => select.append(el('option',{value:v},t)));
+    select.value = rec[i] || '';
+    if (select.value) { totalFactor += Number(select.value); selected++; }
+    select.addEventListener('change', () => {
+      const fresh = ensureMealLog(key);
+      if (select.value) {
+        fresh[i] = select.value;
+        if (!GAME.discoveredMenus.includes(it.name)) GAME.discoveredMenus.push(it.name);
+        if (/고기|생선|계란|달걀|두부|콩|닭|오리|참치|치즈|우유/.test(it.name)) {
+          const marker = day + '|protein-menu|' + it.name;
+          if (!GAME.actions.includes(marker)) GAME.actions.push(marker);
+        }
+        updateBadges(); saveGame();
+      } else delete fresh[i];
+      saveMealLog();
+      awardXP(day + '|intake|' + key + '|' + i, 2, day);
+      refreshCards();
+    });
+    rowBox.append(label, select); box.append(rowBox);
+  });
+  const estimate = el('p', { class:'fine' });
+  if (!selected) estimate.textContent = '아직 기록한 메뉴가 없어요.';
+  else {
+    const count = Math.max(1, items.length), factor = totalFactor / count;
+    estimate.textContent = '기록 메뉴 ' + selected + '/' + items.length + '개 · 추정 섭취량: 열량 ' + (kcal===null?'-':fmt(kcal*factor)) + ' kcal, 탄수화물 ' + (carb===null?'-':fmt(carb*factor)) + ' g, 단백질 ' + (prot===null?'-':fmt(prot*factor)) + ' g, 지방 ' + (fat===null?'-':fmt(fat*factor)) + ' g';
+  }
+  box.append(estimate);
+  return box;
+}
+const MEAL_LOG_KEY = 'gsik-meal-log-v1';
+let MEAL_LOG = {};
+function loadMealLog() { try { const x=JSON.parse(localStorage.getItem(MEAL_LOG_KEY)||'{}'); if(x&&typeof x==='object') MEAL_LOG=x; } catch(e){} }
+function ensureMealLog(key) { if(!MEAL_LOG[key]||typeof MEAL_LOG[key]!=='object') MEAL_LOG[key]={}; return MEAL_LOG[key]; }
+function saveMealLog() { try { localStorage.setItem(MEAL_LOG_KEY,JSON.stringify(MEAL_LOG)); } catch(e){} }
+
+function renderMeal(row) {
+  const kcal = parseKcal(row.CAL_INFO);
+  const meal = el('section', { class: 'meal' });
+  meal.append(el('div', { class: 'meal-head' },
+    el('span', { class: 'meal-name' }, row.MMEAL_SC_NM || '식사'),
+    el('span', { class: 'kcal' }, '열량 ', el('b', null, kcal === null ? '정보 없음' : kcal.toFixed(1)), kcal === null ? '' : ' kcal')));
+
+  // 메뉴 + 알레르기 번호표
+  const items = parseMenu(row.DDISH_NM);
+  const key = mealKey(row);
+  const used = new Set();
+  const ul = el('ul', { class: 'menu' });
+  items.forEach(it => {
+    const li = el('li', null, el('span', null, it.name));
+    it.nums.forEach(n => {
+      used.add(n);
+      li.append(el('span', { class: 'tag', title: ALLERGY[n] || '알 수 없는 번호' }, n + (ALLERGY[n] ? ' ' + ALLERGY[n] : '')));
+    });
+    li.append(voteGroup(key, it.name));   // 좋아요 / 별로예요
+    ul.append(li);
+  });
+  meal.append(ul);
+  const nlist = parseNutrition(row.NTR_INFO);
+  meal.append(renderIntake(row, items, kcal, findNutri(nlist, '탄수화물'), findNutri(nlist, '단백질'), findNutri(nlist, '지방')));
+
+  const names = [...used].sort((a, b) => a - b).map(n => (ALLERGY[n] || '번호 ' + n) + '(' + n + ')');
+  meal.append(el('p', { class: 'allergy-sum' },
+    names.length ? '알레르기 유발 식품: ' + names.join(', ') : '표시된 알레르기 유발 식품이 없습니다.'));
+
+  meal.append(renderNutrition(row));
+
+  if (row.ORPLC_INFO) {
+    const lines = splitBr(row.ORPLC_INFO);
+    meal.append(el('details', null, el('summary', null, '원산지'), el('p', null, lines.join(' / '))));
+  }
+  meal.append(renderReview(row));
+  return meal;
+}
+
+function renderResult(rows) {
+  const byDate = new Map();
+  rows.slice().sort((a, b) => (a.MLSV_YMD + a.MMEAL_SC_CODE).localeCompare(b.MLSV_YMD + b.MMEAL_SC_CODE))
+    .forEach(r => {
+      if (!byDate.has(r.MLSV_YMD)) byDate.set(r.MLSV_YMD, []);
+      byDate.get(r.MLSV_YMD).push(r);
+    });
+  const frag = document.createDocumentFragment();
+  byDate.forEach((meals, ymd) => {
+    const card = el('article', { class: 'day' }, el('h2', null, ymdLabel(ymd)));
+    meals.forEach(m => card.append(renderMeal(m)));
+    frag.append(card);
+  });
+  $('result').replaceChildren(frag);
+}
+
+/* ===================== 조회 실행 ===================== */
+async function search(e) {
+  if (e) e.preventDefault();
+  const dateIso = $('mealDate').value;
+  if (!dateIso) return showNotice('날짜를 확인해 주세요', '조회할 날짜를 골라 주세요.', true);
+
+  $('goBtn').disabled = true;
+  $('goBtn').textContent = '불러오는 중...';
+  $('status').replaceChildren(el('div', { class: 'notice' }, '급식 정보를 불러오는 중입니다...'));
+  $('result').replaceChildren();
+
+  // 조회 기준은 요청한 시점의 값으로 적는다
+  $('criteria').textContent = CONFIG.SCHOOL_NAME + ' · ' + dateIso + ' · 중식·석식' +
+    ' · 조회 시각 ' + new Date().toLocaleString('ko-KR');
+
+  try {
+    const r = await fetchAll(dateIso);
+    if (r.code === 'INFO-200') {
+      showNotice('자료 없음 (INFO-200)', '이 날짜에는 급식 자료가 없습니다. 방학·휴일·시험 기간이거나 급식이 없는 날일 수 있으니 다른 날짜를 골라 보세요.', false);
+    } else if (r.code !== 'INFO-000') {
+      showNotice('요청 오류 (' + r.code + ')', r.message + ' 인증키와 요청 값을 확인해 주세요.', true);
+    } else {
+      // 중식·석식만 남긴다
+      const rows = r.rows.filter(x => CONFIG.SHOW_MEALS.includes(x.MMEAL_SC_CODE));
+      if (!rows.length) {
+        showNotice('중식·석식 자료 없음', '이 날짜에는 중식·석식 급식 자료가 없습니다. 다른 날짜를 골라 보세요.', false);
+      } else {
+        // 요청한 전체 건수보다 적게 받았으면 알려 준다
+        $('status').replaceChildren(r.rows.length < r.total
+          ? el('p', { class: 'count' }, '전체 ' + r.total + '건 중 ' + r.rows.length + '건만 받아 표시합니다.')
+          : '');
+        lastRows = rows;
+        renderResult(rows);
+      }
+    }
+  } catch (err) {
+    showNotice('불러오지 못했습니다', '인터넷 연결 또는 접속 제한 때문에 불러오지 못했습니다.', true);
+  } finally {
+    $('goBtn').disabled = false;
+    $('goBtn').textContent = '급식 조회';
+  }
+}
+
+/* ===================== 내 목표 입력 처리 ===================== */
+// 계산 결과 문구 그리기
+function renderMeOut(state) {
+  const out = $('meOut');
+  if (state.error) {
+    out.replaceChildren(el('div', { class: 'notice error' }, state.error));
+    return;
+  }
+  if (!TARGET) {
+    out.replaceChildren(el('p', { class: 'fine' },
+      '성별, 나이, 키, 체중을 입력하면 한 끼 목표가 계산되고, 아래 급식 카드에 비교와 어울리는 학교 운동이 나타납니다.'));
+    return;
+  }
+  const T = TARGET, m = T.meal, g = T.goal.ratio;
+  const kids = [
+    el('p', { class: 'big' }, '기초대사량 약 ', el('b', null, fmt(T.bmr) + ' kcal'), ' · 하루 필요 열량 약 ', el('b', null, fmt(T.tdee) + ' kcal')),
+    el('p', { class: 'big' }, '한 끼 목표(하루÷' + MEALS_PER_DAY + ') ', el('b', null, fmt(m.kcal) + ' kcal'),
+      ' · 탄수화물 ' + fmt(m.carb) + ' g · 단백질 ' + fmt(m.prot) + ' g · 지방 ' + fmt(m.fat) + ' g'),
+    el('p', { class: 'big' }, T.goal.name + ' 목표 비율 탄 ' + g.carb + ' : 단 ' + g.prot + ' : 지 ' + g.fat +
+      ' (하루 단백질은 체중당 약 ' + T.protPerKg.toFixed(1) + ' g)'),
+    el('p', { class: 'fine' }, '키·체중·활동량으로 계산한 추정값이며 의학적 조언이 아닙니다.')
+  ];
+  if (T.age < 19) {
+    kids.push(el('p', { class: 'fine' },
+      '성장기(만 18세 이하)에는 이 공식이 성인 기준이라 실제와 다를 수 있습니다. 체중 감량·증량은 보호자, 의사, 학교 영양(보건)선생님과 먼저 상의하세요.'));
+  }
+  out.replaceChildren(...kids);
+}
+
+// 입력이 바뀔 때마다: 계산 → 저장 → 급식 카드 다시 그리기
+function onProfileInput() {
+  const st = readProfile();
+  TARGET = st.profile && !st.error && !st.empty ? calcTarget(st.profile) : null;
+  renderMeOut(st);
+  try { localStorage.setItem(PROFILE_KEY, JSON.stringify({
+    sex: $('meSex').value, age: $('meAge').value, height: $('meHeight').value,
+    weight: $('meWeight').value, activity: $('meAct').value, goal: $('meGoal').value })); } catch (e) { /* 저장이 막혀도 앱은 동작 */ }
+  if (lastRows) renderResult(lastRows);
+}
+
+// 저장된 값 불러오기
+function loadProfile() {
+  try {
+    const s = JSON.parse(localStorage.getItem(PROFILE_KEY) || 'null');
+    if (!s) return;
+    $('meSex').value = s.sex || 'm'; $('meAge').value = s.age || '';
+    $('meHeight').value = s.height || ''; $('meWeight').value = s.weight || '';
+    $('meAct').value = s.activity || 'mid'; $('meGoal').value = s.goal || 'keep';
+  } catch (e) { /* 저장된 값이 없거나 읽을 수 없으면 무시 */ }
+}
+
+/* ===================== 시작 ===================== */
+(function init() {
+  $('schoolName').textContent = CONFIG.SCHOOL_NAME;
+  document.title = '급식인사이트 · ' + CONFIG.SCHOOL_NAME;
+  $('mealDate').value = toIso(new Date());   // 기본값: 오늘
+  $('keyWarn').hidden = CONFIG.API_KEY !== 'YOUR_API_KEY';
+  $('searchForm').addEventListener('submit', search);
+  $('mealDate').addEventListener('change', () => { if ($('mealDate').value) search(); }); // 날짜를 고르면 바로 조회
+  loadProfile();
+  loadStore();
+  loadGame();
+  loadMealLog();
+  renderGamePanel();
+  initShare();
+  $('meBox').addEventListener('input', onProfileInput);
+  $('meBox').addEventListener('change', onProfileInput);
+  onProfileInput();
+})();
+</script>
+</body>
+</html>
