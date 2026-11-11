@@ -990,6 +990,8 @@ function renderPet() {
   const type = PET_TYPES.find(t => t.id === PET.type) || PET_TYPES[0];
   const color = PET_COLORS.find(c => c.id === PET.color) || PET_COLORS[0];
   const avatar = el('div',{class:'pet-avatar','aria-label':type.name+' 캐릭터'},petVisual());
+  const wornIcons = PET.equipped.map(id => PET_ITEMS.find(item => item.id === id)).filter(Boolean).map(item => item.icon).join('');
+  if (wornIcons) avatar.append(el('span',{style:'display:block;font-size:1.5rem;line-height:1'},wornIcons));
   if (PET.message && /기뻐|신나|고마워|반가워|최고/.test(PET.message)) avatar.classList.add('is-happy');
   const stage = el('div',{class:'pet-stage',style:'--pet-bg:'+color.value},
     avatar,
@@ -1036,7 +1038,8 @@ function renderPet() {
   const reset = el('button',{type:'button'},'이름·캐릭터 변경');
   reset.addEventListener('click',() => {
     if (!confirm('캐릭터를 새로 만들까요? 기존 캐릭터의 꾸미기와 상태가 초기화됩니다.')) return;
-    PET = null; savePet(); renderPet();
+    try { localStorage.removeItem(PET_KEY); } catch (e) {}
+    PET = null; renderPet();
   });
   tools.append(reset,el('span',{class:'pet-note'},'각 상호작용은 하루 한 번 · 활동 XP는 하루 최대 10 XP'));
   const inventory = el('div',{class:'pet-inventory'},el('h3',null,'🎒 꾸미기 아이템'));
