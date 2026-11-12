@@ -710,7 +710,11 @@ function el(tag, props, ...kids) {
   if (props) for (const k in props) {
     if (k === 'class') e.className = props[k];
     else if (k === 'style') e.style.cssText = props[k];
-    else e.setAttribute(k, props[k]);
+    else if (['disabled','checked','selected','multiple','required','hidden','readonly','autofocus'].includes(k)) {
+      // HTML boolean attributes: setAttribute('disabled', 'false')도 실제로는 비활성화가 되므로
+      // 반드시 DOM 프로퍼티에 참/거짓 값으로 설정한다.
+      e[k === 'readonly' ? 'readOnly' : k] = props[k] === true || props[k] === 'true';
+    } else if (props[k] !== undefined && props[k] !== null) e.setAttribute(k, props[k]);
   }
   kids.forEach(k => e.append(k));
   return e;
@@ -1029,7 +1033,7 @@ function renderPet() {
       if (id==='talk') { PET.happiness=Math.min(100,PET.happiness+5); PET.bond=Math.min(100,PET.bond+8); }
       if (id==='snack') { PET.happiness=Math.min(100,PET.happiness+10); PET.energy=Math.min(100,PET.energy+5); PET.bond=Math.min(100,PET.bond+3); }
       if (id==='play') { PET.happiness=Math.min(100,PET.happiness+8); PET.energy=Math.max(0,PET.energy-5); PET.bond=Math.min(100,PET.bond+6); }
-      awardXP('pet|'+toIso(new Date())+'|'+id,2,toIso(new Date()),'participation');
+      awardXP('pet|'+toIso(new Date())+'|'+id,2,toIso(new Date()));
       savePet(); renderPet();
     });
     actionBox.append(b);
